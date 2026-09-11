@@ -1,0 +1,63 @@
+{
+  "provenance_version": 5,
+  "envelope_version": "importflow-envelope-v4",
+  "authority_status": "release_authoritative",
+  "profile_sha256": "82bc763482ed77bacec91086c8b8670a2219547a78e8208f027bfc3590873d24",
+  "authority_files": [
+    {
+      "path": "spec/importflow-envelope.v4.json",
+      "sha256": "82bc763482ed77bacec91086c8b8670a2219547a78e8208f027bfc3590873d24"
+    },
+    {
+      "path": "docs/PUBLIC_PROFILE_V4.md",
+      "sha256": "0a443b7b64cb5526eb5255fb9cf36b6fb78d52c3467d9b3b102c30c5d8b035a0"
+    },
+    {
+      "path": "docs/DDL_RECOGNITION_V1.md",
+      "sha256": "74371c1841448053feef76b0cf195399c1cb46e56dc7dc3931b8ef42ed3116a4"
+    },
+    {
+      "path": "docs/CHECK_BEHAVIOR_V2.md",
+      "sha256": "2cfc8ffa173b419040db0b5e85780839bf3705569c51ea6c01735b23e1ab433e"
+    },
+    {
+      "path": "spec/reason-templates.v4.json",
+      "sha256": "77eed6325e514c3a5dd23a91809dcf71cad2091f237e54b3d89fcabf4dfc473f"
+    },
+    {
+      "path": "spec/public-profile-cases.v4.json",
+      "sha256": "f80265b30d08b6afe95c353c9ff40aea4cba0faa7af766cdc4b49883060364c0"
+    }
+  ],
+  "projection_review": {
+    "record_id": "pgic-v4-projection-2026-09-09",
+    "outcome": "PASS"
+  },
+  "publication_review": {
+    "record_id": "pgic-v4-publication-2026-09-09-round2",
+    "outcome": "GO"
+  },
+  "founder_approval": {
+    "identity_role": "ImportFlow Founder",
+    "authorization_record": "pgic-v4-conditional-founder-authorization",
+    "status": "approved_under_conditional_authorization",
+    "date": "2026-09-09"
+  },
+  "redistribution_approval": "approved",
+  "license": "MIT",
+  "owner_roles": [
+    "ImportFlow product owner",
+    "Public profile technical maintainer",
+    "Independent projection reviewer",
+    "Independent publication reviewer"
+  ],
+  "applicability": {
+    "stage": "Founder-Assisted Alpha",
+    "as_of": "2026-09-09",
+    "destination_context": "Supabase-hosted PostgreSQL",
+    "postgresql_major": 17,
+    "integration_context": "The Alpha offering uses a supported React/Next.js integration; this checker does not assess application eligibility.",
+    "offline_currentness_claim": false
+  },
+  "attestation_note": "Detailed source mapping and reviewer records are retained privately. This record is a publication attestation, not live database or production approval."
+}

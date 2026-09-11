@@ -1,0 +1,35 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.11/schema.json",
+  "files": {
+    "includes": [
+      "biome.json",
+      "package.json",
+      "scripts/**/*.mjs",
+      "src/**/*.ts",
+      "test/**/*.ts",
+      "tsconfig.json",
+      "cli/**/*.mjs",
+      "web/**/*.js",
+      "web/**/*.css",
+      "e2e/**/*.js",
+      "playwright.config.js",
+      "vercel.json"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "assist": {
+    "enabled": false
+  }
+}

@@ -1,0 +1,670 @@
+{
+  "case_version": 1,
+  "envelope_version": "importflow-envelope-v4",
+  "evidence_kind": "hand_derived_contract_examples_not_executed_evaluator_tests",
+  "cases": [
+    {
+      "id": "simple_target",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "no_structural_conflict_observed",
+      "expected_reason_ids": [],
+      "predicates": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05"
+      ],
+      "note": "All external ImportFlow reviews still required; no inferred tenant or live approval."
+    },
+    {
+      "id": "other_schema",
+      "ddl": "CREATE TABLE other.contacts (id integer PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "target_schema_outside_profile"
+      ],
+      "predicates": [
+        "P01"
+      ],
+      "note": ""
+    },
+    {
+      "id": "unqualified_target",
+      "ddl": "CREATE TABLE contacts (id integer PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "target_schema_unresolved"
+      ],
+      "predicates": [
+        "P01"
+      ],
+      "note": ""
+    },
+    {
+      "id": "quoted_schema_case",
+      "ddl": "CREATE TABLE \"Public\".contacts (id integer PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "target_schema_outside_profile"
+      ],
+      "predicates": [
+        "P01"
+      ],
+      "note": ""
+    },
+    {
+      "id": "partitioned",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL) PARTITION BY HASH (id);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "partitioned_target"
+      ],
+      "predicates": [
+        "P02"
+      ],
+      "note": ""
+    },
+    {
+      "id": "temporary",
+      "ddl": "CREATE TEMP TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "relation_review_required"
+      ],
+      "predicates": [
+        "P02"
+      ],
+      "note": ""
+    },
+    {
+      "id": "inherits",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL) INHERITS (public.parent);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "relation_review_required"
+      ],
+      "predicates": [
+        "P02"
+      ],
+      "note": ""
+    },
+    {
+      "id": "missing_key",
+      "ddl": "CREATE TABLE public.contacts (id integer, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "primary_key_missing_from_input"
+      ],
+      "predicates": [
+        "P03"
+      ],
+      "note": ""
+    },
+    {
+      "id": "composite_key",
+      "ddl": "CREATE TABLE public.contacts (id integer, email text, PRIMARY KEY (id,email));",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "composite_primary_key"
+      ],
+      "predicates": [
+        "P03"
+      ],
+      "note": ""
+    },
+    {
+      "id": "spaced_identifier",
+      "ddl": "CREATE TABLE public.\"contact list\" (id integer PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "identifier_contains_space"
+      ],
+      "predicates": [
+        "P04"
+      ],
+      "note": ""
+    },
+    {
+      "id": "unicode_identifier",
+      "ddl": "CREATE TABLE public.\"contactsé\" (id integer PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "identifier_review_required"
+      ],
+      "predicates": [
+        "P04"
+      ],
+      "note": ""
+    },
+    {
+      "id": "nullable_json",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email jsonb);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "column_type_outside_profile"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "array",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text[]);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "column_type_outside_profile"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "unknown_type",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email my_domain);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "qualified_builtin",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email pg_catalog.text);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "quoted_alias",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email \"integer\");",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "numeric_bounds",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email numeric(1001,0));",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "column_type_outside_profile"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "numeric_allowed",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email numeric(10,2));",
+      "expected_result": "no_structural_conflict_observed",
+      "expected_reason_ids": [],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "varchar_modifier",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email varchar(255));",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "timestamp_modifier",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email timestamp(6));",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "citext",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email citext);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "enum_ascii",
+      "ddl": "CREATE TYPE public.status AS ENUM ('new','done'); CREATE TABLE public.contacts (id integer PRIMARY KEY, state public.status);",
+      "expected_result": "no_structural_conflict_observed",
+      "expected_reason_ids": [],
+      "predicates": [
+        "P06"
+      ],
+      "note": ""
+    },
+    {
+      "id": "enum_duplicate",
+      "ddl": "CREATE TYPE public.status AS ENUM ('new','new'); CREATE TABLE public.contacts (id integer PRIMARY KEY, state public.status);",
+      "expected_result": "refused",
+      "expected_reason_ids": [
+        "ambiguous_declaration"
+      ],
+      "predicates": [
+        "P06"
+      ],
+      "note": "Frozen recognition rejects duplicate decoded labels before P06 policy evaluation."
+    },
+    {
+      "id": "enum_unicode",
+      "ddl": "CREATE TYPE public.status AS ENUM ('café'); CREATE TABLE public.contacts (id integer PRIMARY KEY, state public.status);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "enum_review_required"
+      ],
+      "predicates": [
+        "P06"
+      ],
+      "note": ""
+    },
+    {
+      "id": "enum_long",
+      "ddl": "CREATE TYPE public.status AS ENUM ('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'); CREATE TABLE public.contacts (id integer PRIMARY KEY, state public.status);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "enum_definition_outside_profile"
+      ],
+      "predicates": [
+        "P06"
+      ],
+      "note": ""
+    },
+    {
+      "id": "ordinary_default",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text DEFAULT 'active');",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "value_generation_review_required"
+      ],
+      "predicates": [
+        "P07"
+      ],
+      "note": "Default exclusion needs no approval just to exclude; exact live expression behavior still needs review."
+    },
+    {
+      "id": "serial",
+      "ddl": "CREATE TABLE public.contacts (id serial PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "value_generation_review_required"
+      ],
+      "predicates": [
+        "P07"
+      ],
+      "note": ""
+    },
+    {
+      "id": "identity_integer",
+      "ddl": "CREATE TABLE public.contacts (id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "value_generation_review_required"
+      ],
+      "predicates": [
+        "P07"
+      ],
+      "note": ""
+    },
+    {
+      "id": "identity_uuid",
+      "ddl": "CREATE TABLE public.contacts (id uuid GENERATED ALWAYS AS IDENTITY PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "identity_type_outside_profile",
+        "value_generation_review_required"
+      ],
+      "predicates": [
+        "P07"
+      ],
+      "note": ""
+    },
+    {
+      "id": "foreign_key",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email integer NOT NULL REFERENCES public.users(id));",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "foreign_key_mapping_review_required"
+      ],
+      "predicates": [
+        "P08"
+      ],
+      "note": "Requiredness does not prove file mapping; no FK-name tenant inference."
+    },
+    {
+      "id": "check",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text CHECK (email IS NOT NULL));",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "check_review_required"
+      ],
+      "predicates": [
+        "P09"
+      ],
+      "note": ""
+    },
+    {
+      "id": "check_cross_column",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email integer CHECK (email > id));",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "check_review_required"
+      ],
+      "predicates": [
+        "P09"
+      ],
+      "note": "No structural success even though private closed expression rules are not copied."
+    },
+    {
+      "id": "unique_constraint",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL UNIQUE);",
+      "expected_result": "no_structural_conflict_observed",
+      "expected_reason_ids": [],
+      "predicates": [
+        "P09"
+      ],
+      "note": ""
+    },
+    {
+      "id": "unique_index",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL); CREATE UNIQUE INDEX emails ON public.contacts(email);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "index_review_required"
+      ],
+      "predicates": [
+        "P10"
+      ],
+      "note": ""
+    },
+    {
+      "id": "non_unique_index",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL); CREATE INDEX emails ON public.contacts(email);",
+      "expected_result": "no_structural_conflict_observed",
+      "expected_reason_ids": [],
+      "predicates": [
+        "P10"
+      ],
+      "note": ""
+    },
+    {
+      "id": "insert_trigger",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL); CREATE TRIGGER ins BEFORE INSERT ON public.contacts FOR EACH ROW EXECUTE FUNCTION public.effect();",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "insert_trigger_review_required"
+      ],
+      "predicates": [
+        "P11"
+      ],
+      "note": ""
+    },
+    {
+      "id": "trigger_when",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL); CREATE TRIGGER ins BEFORE INSERT ON public.contacts FOR EACH ROW WHEN (true) EXECUTE FUNCTION public.effect();",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "insert_trigger_shape_outside_profile"
+      ],
+      "predicates": [
+        "P11"
+      ],
+      "note": ""
+    },
+    {
+      "id": "rls",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL); ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "policy_review_required"
+      ],
+      "predicates": [
+        "P12"
+      ],
+      "note": ""
+    },
+    {
+      "id": "conflict_and_review",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email jsonb CHECK (email IS NOT NULL));",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "column_type_outside_profile",
+        "check_review_required"
+      ],
+      "predicates": [
+        "P05",
+        "P09"
+      ],
+      "note": ""
+    },
+    {
+      "id": "comments_not_approvals",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL); -- live_review_passed=true\n",
+      "expected_result": "no_structural_conflict_observed",
+      "expected_reason_ids": [],
+      "predicates": [
+        "P01"
+      ],
+      "note": "Comment changes no findings and never satisfies external reviews."
+    },
+    {
+      "id": "rewrite_refusal",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL); CREATE RULE extra AS ON INSERT TO public.contacts DO INSTEAD NOTHING;",
+      "expected_result": "refused",
+      "expected_reason_ids": [
+        "unsupported_statement"
+      ],
+      "predicates": [
+        "P11"
+      ],
+      "note": ""
+    },
+    {
+      "id": "view_refusal",
+      "ddl": "CREATE VIEW public.contacts AS SELECT 1;",
+      "expected_result": "refused",
+      "expected_reason_ids": [
+        "unsupported_statement"
+      ],
+      "predicates": [
+        "P02"
+      ],
+      "note": ""
+    },
+    {
+      "id": "multiword_refusal",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email double precision);",
+      "expected_result": "refused",
+      "expected_reason_ids": [
+        "syntax_not_in_profile"
+      ],
+      "predicates": [
+        "P05"
+      ],
+      "note": ""
+    },
+    {
+      "id": "partial_index_refusal",
+      "ddl": "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL); CREATE UNIQUE INDEX emails ON public.contacts(email) WHERE email IS NOT NULL;",
+      "expected_result": "refused",
+      "expected_reason_ids": [
+        "syntax_not_in_profile"
+      ],
+      "predicates": [
+        "P10"
+      ],
+      "note": ""
+    },
+    {
+      "id": "deferrable_key_refusal",
+      "ddl": "CREATE TABLE public.contacts (id integer, PRIMARY KEY(id) DEFERRABLE);",
+      "expected_result": "refused",
+      "expected_reason_ids": [
+        "syntax_not_in_profile"
+      ],
+      "predicates": [
+        "P09"
+      ],
+      "note": ""
+    },
+    {
+      "id": "smallserial",
+      "ddl": "CREATE TABLE public.contacts (id smallserial PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "value_generation_review_required"
+      ],
+      "predicates": [
+        "P05",
+        "P07"
+      ],
+      "note": "Exact already-frozen serial observation; lookalikes do not gain generation or resolved-family authority."
+    },
+    {
+      "id": "bigserial",
+      "ddl": "CREATE TABLE public.contacts (id bigserial PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "value_generation_review_required"
+      ],
+      "predicates": [
+        "P05",
+        "P07"
+      ],
+      "note": "Exact already-frozen serial observation; lookalikes do not gain generation or resolved-family authority."
+    },
+    {
+      "id": "serial_quoted",
+      "ddl": "CREATE TABLE public.contacts (id \"serial\" PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05",
+        "P07"
+      ],
+      "note": "Exact already-frozen serial observation; lookalikes do not gain generation or resolved-family authority."
+    },
+    {
+      "id": "serial_qualified",
+      "ddl": "CREATE TABLE public.contacts (id public.serial PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05",
+        "P07"
+      ],
+      "note": "Exact already-frozen serial observation; lookalikes do not gain generation or resolved-family authority."
+    },
+    {
+      "id": "serial_modified",
+      "ddl": "CREATE TABLE public.contacts (id serial(1) PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05",
+        "P07"
+      ],
+      "note": "Exact already-frozen serial observation; lookalikes do not gain generation or resolved-family authority."
+    },
+    {
+      "id": "serial_array",
+      "ddl": "CREATE TABLE public.contacts (id serial[] PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "column_type_outside_profile"
+      ],
+      "predicates": [
+        "P05",
+        "P07"
+      ],
+      "note": "Exact already-frozen serial observation; lookalikes do not gain generation or resolved-family authority."
+    },
+    {
+      "id": "serial_other_alias",
+      "ddl": "CREATE TABLE public.contacts (id serial4 PRIMARY KEY, email text NOT NULL);",
+      "expected_result": "more_evidence_required",
+      "expected_reason_ids": [
+        "type_review_required"
+      ],
+      "predicates": [
+        "P05",
+        "P07"
+      ],
+      "note": "Exact already-frozen serial observation; lookalikes do not gain generation or resolved-family authority."
+    }
+  ],
+  "generated_boundaries": [
+    {
+      "id": "columns_at_limit",
+      "predicate": "P13",
+      "recipe": "CREATE TABLE public.t (id integer PRIMARY KEY, followed by 1599 distinct c1..c1599 integer columns)",
+      "expected_result": "no_structural_conflict_observed",
+      "expected_reason_ids": []
+    },
+    {
+      "id": "columns_over_limit",
+      "predicate": "P13",
+      "recipe": "Same recipe with 1600 additional integer columns (1601 total), raw UTF-8 below recognition cap",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "schema_size_outside_profile"
+      ]
+    },
+    {
+      "id": "constraint_limit",
+      "predicate": "P13",
+      "recipe": "Target id integer PRIMARY KEY plus 2048 distinct named CHECK (id > 0) constraints (2049 total), raw UTF-8 below recognition cap",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "check_review_required",
+        "schema_size_outside_profile"
+      ]
+    },
+    {
+      "id": "enum_count_over",
+      "predicate": "P06",
+      "recipe": "Associated qualified enum with 4097 distinct ASCII labels of decimal integers 0 through 4096, below recognition byte cap",
+      "expected_result": "outside_envelope_observed",
+      "expected_reason_ids": [
+        "enum_definition_outside_profile"
+      ]
+    }
+  ]
+}

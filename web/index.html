@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="Check PostgreSQL DDL locally against ImportFlow’s reviewed Alpha target-schema profile. Your schema is not uploaded for analysis." />
+    <title>pg-import-check · ImportFlow</title>
+    <link rel="stylesheet" href="__STYLE_CSS__" />
+    <script type="module" src="__APP_JS__"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#ddl">Skip to schema input</a>
+    <div class="shell">
+      <header class="masthead">
+        <span class="brand">ImportFlow <span class="brand-divider" aria-hidden="true">/</span> <span class="tool-name">pg-import-check</span></span>
+        <span class="badge">Founder-Assisted Alpha</span>
+      </header>
+
+      <main>
+        <section class="intro" aria-labelledby="page-title">
+          <p class="eyebrow">PostgreSQL target-schema check</p>
+          <h1 id="page-title">Understand your DDL.<br />Know what needs review.</h1>
+          <p class="lede">Check your PostgreSQL DDL against ImportFlow’s reviewed Alpha target-schema profile.</p>
+          <p class="privacy"><span class="local-mark" aria-hidden="true"></span><strong>Analyzed locally in your browser.</strong> Your schema is not uploaded for analysis or saved by this app.</p>
+          <div class="scope-notice">
+            <strong>No production approval or migration guarantee.</strong>
+            <span>Only supplied DDL is checked. Live schema, permissions, RLS, and trigger effects are not verified. ImportFlow review is still required.</span>
+          </div>
+          <p class="helper">Alpha scope: one <code>public</code> target on Supabase-hosted PostgreSQL 17, for insert-only imports.</p>
+          <p class="profile"><code>importflow-envelope-v4</code><span aria-hidden="true"> · </span><time datetime="2026-09-09">September 9, 2026</time><span class="profile-note">Offline snapshot; current availability not verified.</span></p>
+        </section>
+
+        <div class="workspace">
+          <section class="panel input-panel" aria-labelledby="input-title">
+            <div class="panel-heading">
+              <div><p class="eyebrow">01 / Input</p><h2 id="input-title">Your schema</h2></div>
+              <button type="button" id="example" class="button secondary" disabled>Load example</button>
+            </div>
+            <form id="check-form" autocomplete="off">
+              <div class="editor-label"><label for="ddl">PostgreSQL DDL</label><span class="muted">Plain text</span></div>
+              <p id="input-help" class="helper">Supply one CREATE TABLE target and its supported associated declarations. Maximum 262,144 UTF-8 bytes.</p>
+              <textarea id="ddl" maxlength="262145" rows="8" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" wrap="off" dir="ltr" aria-describedby="input-help input-note" placeholder="Paste your CREATE TABLE statement here…"></textarea>
+              <p id="input-note" class="helper input-note">Start with your DDL or load the example.</p>
+              <div class="actions">
+                <button id="check" type="submit" class="button primary" aria-keyshortcuts="Control+Enter Meta+Enter" disabled>Check schema <span aria-hidden="true">→</span></button>
+                <button id="reset" type="button" class="button secondary" disabled>Reset</button>
+                <span class="shortcut">Ctrl / ⌘ + Enter</span>
+              </div>
+            </form>
+          </section>
+
+          <section id="result" class="panel result-panel" aria-labelledby="result-title" aria-busy="false" data-outcome="empty">
+            <div class="panel-heading">
+              <div><p class="eyebrow">02 / Report</p><h2 id="result-title" tabindex="-1">Ready when you are</h2></div>
+              <button id="copy" type="button" class="button secondary" disabled>Copy report</button>
+            </div>
+            <p id="result-summary" class="result-summary">Run a check to see observations, findings, and the areas that need ImportFlow review.</p>
+            <div id="empty-state" class="empty-state">
+              <span class="empty-symbol" aria-hidden="true">[ sql ]</span>
+              <p>Your report will appear here.</p>
+              <p class="helper">The check runs on your device.<br />No account or database connection needed.</p>
+            </div>
+            <p class="helper">Copied reports may contain schema identifiers. Share only what you intend.</p>
+              <pre id="report" tabindex="0" role="region" aria-label="Complete checker report" dir="ltr" hidden></pre>
+          </section>
+        </div>
+
+        <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Ready. Paste your DDL or load an example to begin.</p>
+        <noscript><p class="scope-notice">JavaScript is required to run this local browser check. Enable JavaScript and reload the page.</p></noscript>
+
+        <section class="reading-guide" aria-labelledby="guide-title">
+          <h2 id="guide-title">Reading the result</h2>
+          <dl class="outcomes">
+            <div><dt>Structural conflict observed</dt><dd>Explicit declarations conflict with the dated Alpha profile.</dd></div>
+            <div><dt>More evidence required</dt><dd>A declared feature or missing declaration needs ImportFlow review.</dd></div>
+            <div><dt>No structural conflict observed</dt><dd>No conflict was found among the declarations evaluated. External review is still required.</dd></div>
+            <div><dt>Analysis refused</dt><dd>The input cannot be fully analyzed under the accepted grammar or input limits. This is not a finding of incompatibility.</dd></div>
+          </dl>
+        </section>
+      </main>
+
+      <footer><nav aria-label="Project links"><a href="mailto:mohamed@importflow.dev">Discuss with ImportFlow</a><a href="https://github.com/iammohamedatef/pg-import-check">Source and profile docs</a><a href="mailto:mohamed@importflow.dev">Report a security issue privately</a></nav><span>pg-import-check <span aria-hidden="true">/</span> ImportFlow Alpha</span><span>Local analysis · No uploads · No telemetry</span></footer>
+    </div>
+  </body>
+</html>

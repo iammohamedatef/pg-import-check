@@ -1,0 +1,27 @@
+{
+  "template_version": 1,
+  "envelope_version": "importflow-envelope-v4",
+  "messages": {
+    "target_schema_outside_profile": "The explicitly named target schema is outside this public profile.",
+    "target_schema_unresolved": "The supplied target does not name its schema.",
+    "partitioned_target": "The supplied target declares partitioning, outside this public profile.",
+    "relation_review_required": "Temporary or inherited target behavior requires ImportFlow review.",
+    "primary_key_missing_from_input": "No primary key was declared in the supplied input.",
+    "composite_primary_key": "The declared primary key contains more than one column.",
+    "identifier_contains_space": "A target-profile identifier contains an ASCII space.",
+    "identifier_review_required": "A target-profile identifier requires Unicode compatibility review.",
+    "column_type_outside_profile": "A supplied column declares a type shape outside this public profile.",
+    "type_review_required": "A supplied type identity or modifier cannot be resolved by this public check.",
+    "enum_definition_outside_profile": "A supplied enum violates a public label restriction.",
+    "enum_review_required": "A supplied enum requires Unicode label review.",
+    "identity_type_outside_profile": "A declared identity column has a resolved non-integer type.",
+    "value_generation_review_required": "Declared generation/default behavior requires ImportFlow review.",
+    "foreign_key_mapping_review_required": "Foreign-key mapping requires a reviewed source of values.",
+    "check_review_required": "A supplied CHECK expression is not evaluated by this public check.",
+    "index_review_required": "A supplied unique index requires import-relevance review.",
+    "insert_trigger_shape_outside_profile": "An INSERT trigger declares an unsupported constraint or WHEN shape.",
+    "insert_trigger_review_required": "An INSERT trigger and its function effects require ImportFlow review.",
+    "policy_review_required": "Supplied RLS or policy declarations require effective-authorization review.",
+    "schema_size_outside_profile": "The supplied target exceeds a public schema-profile ceiling."
+  }
+}
