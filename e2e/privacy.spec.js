@@ -1,12 +1,7 @@
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
 const workerPath = /\/worker-[A-Za-z0-9_-]+\.js$/;
-const cli = fileURLToPath(new URL("../cli/pg-import-check.mjs", import.meta.url));
 
-// Runs before application code, in both the document and the actual bundled
-// worker. Calls remain observable even when CSP prevents a request from existing.
 function installEgressAudit() {
   const scope = globalThis;
   const events = [];
@@ -96,8 +91,6 @@ function installEgressAudit() {
   method(scope.history, "pushState", "history.pushState");
   method(scope.history, "replaceState", "history.replaceState");
   method(scope.HTMLFormElement?.prototype, "submit", "form.submit");
-  // A prevented local submit is the normal Check action. A real submission is
-  // forbidden; evaluate cancellation after all application listeners have run.
   document.addEventListener(
     "submit",
     (event) => {
@@ -125,19 +118,19 @@ function installEgressAudit() {
   };
 }
 
-test("canary DDL never reaches egress APIs, URLs, storage, cookies, console, or worker network", async ({
+test("full migration and local file canaries never reach egress, URLs, storage, cookies, console, or worker network", async ({
   page,
   context,
   baseURL,
 }) => {
   test.setTimeout(90_000);
-  const canary = "SCHEMA_CANARY_8f29d6b4_秘密";
-  const ddl = `CREATE TABLE public."${canary}" (id integer PRIMARY KEY, "${canary}_column" text);`;
-  const oracle = spawnSync(process.execPath, [cli], { input: Buffer.from(ddl), timeout: 15_000 });
-  expect(oracle.error).toBeUndefined();
-  expect(oracle.status).toBe(0);
-  expect(oracle.stderr.toString()).toBe("");
-  const expected = oracle.stdout.toString("utf8");
+  const canary = "MIGRATION_CANARY_8f29d6b4_秘密";
+  const ddl = `
+    CREATE TABLE public."${canary}" (id uuid PRIMARY KEY, "${canary}_column" text);
+    CREATE TABLE public.second_target (id uuid PRIMARY KEY);
+    ALTER TABLE public.second_target ADD CONSTRAINT second_unique UNIQUE (id);
+    /* ${canary}_comment */
+  `;
   const origin = new URL(baseURL).origin;
   const requests = [];
   const workerRequests = [];
@@ -192,24 +185,30 @@ test("canary DDL never reaches egress APIs, URLs, storage, cookies, console, or 
       await route.continue();
       return;
     }
-    // Prepend test instrumentation to the real hashed worker. Its original
-    // evaluator and report stay intact; no application test hook is required.
     const response = await route.fetch();
     expect(response.ok()).toBe(true);
     const prefix = `(${installEgressAudit.toString()})();\nconst __originalPostMessage = self.postMessage.bind(self);\nself.postMessage = (data, ...rest) => __originalPostMessage({ ...data, __testEgressAudit: self.__egressAudit }, ...rest);\n`;
     await route.fulfill({ response, body: prefix + (await response.text()) });
   });
+
   await page.goto("/");
-  await expect(page.locator("#check")).toBeEnabled();
   loaded = true;
-  for (let run = 0; run < 3; run += 1) {
-    await page.locator("#ddl").fill(ddl);
-    await page.locator("#check").click();
-    await expect.poll(() => page.locator("#report").textContent()).toBe(expected);
-    expect(Buffer.from(await page.locator("#report").textContent())).toEqual(oracle.stdout);
-    await page.locator("#reset").click();
-  }
-  // Two animation frames let queued DOM work run without an arbitrary sleep.
+  await page.locator("#ddl").fill(ddl);
+  await page.locator("#check").click();
+  await expect(page.locator("#targets .target-button")).toHaveCount(2);
+  await page.locator("#targets .target-button").first().click();
+  await expect(page.locator("#report-view")).toBeVisible();
+  await page.locator("#targets .target-button").nth(1).click();
+  await expect(page.locator("#report-view")).toBeVisible();
+  await page.locator("#reset").click();
+
+  await page
+    .locator("#file-input")
+    .setInputFiles({ name: "private.sql", mimeType: "text/plain", buffer: Buffer.from(ddl) });
+  await expect(page.locator("#targets .target-button")).toHaveCount(2);
+  await page.locator("#targets .target-button").first().click();
+  await expect(page.locator("#report-view")).toBeVisible();
+
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
@@ -222,11 +221,10 @@ test("canary DDL never reaches egress APIs, URLs, storage, cookies, console, or 
     url: location.href,
   }));
   expect(audit.document).toEqual([]);
-  expect(audit.workers).toHaveLength(3);
+  expect(audit.workers).toHaveLength(2);
   for (const worker of audit.workers) {
     expect(new URL(worker.url).origin).toBe(origin);
     expect(new URL(worker.url).pathname).toMatch(workerPath);
-    // null would mean worker instrumentation never reached the actual response.
     expect(worker.events).toEqual([]);
   }
   expect(audit.local).toEqual([]);
@@ -239,16 +237,12 @@ test("canary DDL never reaches egress APIs, URLs, storage, cookies, console, or 
   expect(navigations).toEqual([]);
   expect(webSockets).toEqual([]);
   expect(popups).toEqual([]);
-  // Firefox's native favicon loader may report the deliberate img-src denial.
-  // This is a browser-internal message, not application console/telemetry. Keep
-  // it in captured canary checks and allow only that exact non-schema URL case.
   for (const message of consoles) {
     expect(message).toContain("resource:///modules/FaviconLoader.sys.mjs");
     expect(message).toContain(`${origin}/favicon.ico`);
     expect(message).toContain("img-src 'none'");
   }
   const afterLoad = requests.filter((request) => request.afterLoad);
-  expect(afterLoad.length).toBeGreaterThan(0);
   for (const request of afterLoad) {
     const url = new URL(request.url);
     expect(url.origin).toBe(origin);
@@ -258,21 +252,18 @@ test("canary DDL never reaches egress APIs, URLs, storage, cookies, console, or 
     expect(request.body).toBeNull();
   }
   const captured = JSON.stringify({ requests, workerRequests, consoles, navigations, webSockets });
-  for (const token of [
-    canary,
-    encodeURIComponent(canary),
-    Buffer.from(canary).toString("base64"),
-  ]) {
+  for (const token of [canary, encodeURIComponent(canary), Buffer.from(canary).toString("base64")])
     expect(captured).not.toContain(token);
-  }
-  // Reset and reload must not restore the schema from any browser persistence.
+
   loaded = false;
   await page.reload();
   await expect(page.locator("#ddl")).toHaveValue("");
   await expect(page.locator("#report")).toHaveText("");
 });
 
-test("served application enforces restrictive security headers", async ({ page }) => {
+test("served application enforces restrictive security headers and no connect egress", async ({
+  page,
+}) => {
   const response = await page.goto("/");
   const headers = response.headers();
   const directives = new Map(

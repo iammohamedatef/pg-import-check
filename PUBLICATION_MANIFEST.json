@@ -28,8 +28,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "27c924d3082c8ee0969ce8a8a5d64a758c04399ce64f6c532d3ace072412376e",
-      "bytes": 5159
+      "sha256": "c3e8525e8bc44202ab5eb9f43e6fd75eb231a290999411f9b5f2fb82d9920f05",
+      "bytes": 6533
     },
     {
       "path": "SPECIFICATION.md",
@@ -58,8 +58,8 @@
     },
     {
       "path": "docs/ARCHITECTURE.md",
-      "sha256": "905133c705cded7479df6c2555e759662f92d1aa477a6474210ea6c09ff75c8d",
-      "bytes": 3395
+      "sha256": "b618a2d0c33e7fd0d0a55228ce90a8aba1e64202d457304a23c30bb6f529e79e",
+      "bytes": 4235
     },
     {
       "path": "docs/CHECK_BEHAVIOR_V2.md",
@@ -68,8 +68,8 @@
     },
     {
       "path": "docs/CONTRIBUTING.md",
-      "sha256": "6bf3c36b629f86a0415f314a8f3f8b9d71506eb5c01710bcf63965601b71414d",
-      "bytes": 2064
+      "sha256": "0f475d80405e1917de3bf0a6b62d287c1e313c14d72ac019cb408c1c4b02f47b",
+      "bytes": 2130
     },
     {
       "path": "docs/DDL_RECOGNITION_V1.md",
@@ -87,14 +87,19 @@
       "bytes": 4700
     },
     {
+      "path": "docs/MIGRATION_ANALYZER_V02.md",
+      "sha256": "d5c134ad614429d24580f55ea3820757b975ff57cca72e66df62dc051c03f813",
+      "bytes": 5873
+    },
+    {
       "path": "docs/PUBLIC_PROFILE_V4.md",
       "sha256": "0a443b7b64cb5526eb5255fb9cf36b6fb78d52c3467d9b3b102c30c5d8b035a0",
       "bytes": 13741
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "90bea9ab6cd3536684c7eacfacb568f41fe21c20d3f0386bb35fdaf256622801",
-      "bytes": 3512
+      "sha256": "ccae409a1d41d9f57ff208733ffb1a01177b0b0ccfaac19f3a9811127bb70a1e",
+      "bytes": 4365
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -128,33 +133,33 @@
     },
     {
       "path": "e2e/checker.spec.js",
-      "sha256": "1b291cbf7018c9b3a6edb72e2bcd4e5e68dff676ffb300e6713cee2027531e4b",
-      "bytes": 12702
+      "sha256": "066e8a30c1977413850bb6ae1311fe680ca35c19e574e52b5f2aa5a3facfaf35",
+      "bytes": 14069
     },
     {
       "path": "e2e/privacy.spec.js",
-      "sha256": "657c77c99ccfa7e39e3b33503a0e0d260e1ce3feb0c81b9d30b920868833bd05",
-      "bytes": 11639
+      "sha256": "f07c51e8248b39527c0f7de3195de4efaa6880521c84aef8ac0a1ddce6d0b959",
+      "bytes": 10773
     },
     {
       "path": "e2e/utf16.spec.js",
-      "sha256": "3a178db8b351c9773697636d3762512d76b4c00b6a1d7f4c010d5bcbcf19a4f8",
-      "bytes": 6638
+      "sha256": "a90ab0db5658caeff391a917517c05ca6c2a10c2bca87181113b630fc2829ad5",
+      "bytes": 4687
     },
     {
       "path": "e2e/worker.spec.js",
-      "sha256": "e9b27f28d0de44708ccd1d6f477e683b98e663f6d6dd1ba1deb635fceca29cb9",
-      "bytes": 7669
+      "sha256": "991bf1d501e12046ee3386deb6736de27227fc17fad123901a5abbf795e440af",
+      "bytes": 6602
     },
     {
       "path": "package-lock.json",
-      "sha256": "5d411bc584b6ad29ebd02f9eb8b26cff8812bd1db1a4ce420392da7029206814",
+      "sha256": "b62ce8d193eaede491b359cc89a38176c7db423d3c46a85f1c29349055786d9d",
       "bytes": 34395
     },
     {
       "path": "package.json",
-      "sha256": "93555bf443a30de088c8736db58056e51fe9f8ea96bfb76ece8946faf2dad2ed",
-      "bytes": 5304
+      "sha256": "dc6883e6d4d7895cc41f31ff21d71a0e0e38e0fda470e25d74665ede8f9861f8",
+      "bytes": 5649
     },
     {
       "path": "playwright.config.js",
@@ -198,8 +203,8 @@
     },
     {
       "path": "scripts/verify-package-safety.mjs",
-      "sha256": "3ef63773de641db725f1e870829cedc371b7634d9a485b9586c7f3972a12d683",
-      "bytes": 2793
+      "sha256": "70d1f5766d8d2cba41423a5a7bc79f503b2855a0134a4fc16d9520951c29ea23",
+      "bytes": 2839
     },
     {
       "path": "spec/importflow-envelope.v4.json",
@@ -350,6 +355,41 @@
       "path": "src/lexical-trivia.ts",
       "sha256": "38285c79e3bff97fee1b97c4a9b771ba6dc917264e42c002d95a8a39ecc04ab9",
       "bytes": 2010
+    },
+    {
+      "path": "src/migration-api.ts",
+      "sha256": "c791a55be0025b19e08df529a28a3972f8a277311c863a98de435f38d7f2e494",
+      "bytes": 2897
+    },
+    {
+      "path": "src/migration-association.ts",
+      "sha256": "5fa16a5bc0035e3bbde138f1a06f117c92c3e2363602261d42593ee6141d4aef",
+      "bytes": 15800
+    },
+    {
+      "path": "src/migration-document.ts",
+      "sha256": "781b300cfd03c94894d7d81c5ed9cf3f00d7f3350e080e0e78bd007f8cd452f3",
+      "bytes": 19717
+    },
+    {
+      "path": "src/migration-evaluator.ts",
+      "sha256": "68d2786e26889e71b86e92aee0a96da564e9b9725ae23025af93469c08f5cd84",
+      "bytes": 14353
+    },
+    {
+      "path": "src/migration-input.ts",
+      "sha256": "12e02d0f6b9158c8ac8eb7071649fb0575113ecb8e6b67daff50d4c56f9a5725",
+      "bytes": 2936
+    },
+    {
+      "path": "src/migration-normalization.ts",
+      "sha256": "255bf673018c9d76228f8540f2baf9ead076786d741bb6f3b16bb5cfe031f203",
+      "bytes": 15425
+    },
+    {
+      "path": "src/migration-report.ts",
+      "sha256": "b84648c9cd1db6cb7bd0bb755ea070871d7102edb278f25f040a9b08a5a35ba9",
+      "bytes": 9146
     },
     {
       "path": "src/policy-evaluator.ts",
@@ -532,6 +572,16 @@
       "bytes": 6581
     },
     {
+      "path": "test/migration-v02-security.test.ts",
+      "sha256": "84ce659c5ef718c56f780ea900a3db063d1018dfb65702c157203362f082a62b",
+      "bytes": 15871
+    },
+    {
+      "path": "test/migration-v02.test.ts",
+      "sha256": "570953cfb83be0294446367f221b3445b2690f52f4041e83245e43162b7d10e0",
+      "bytes": 15278
+    },
+    {
       "path": "test/report-contract.test.ts",
       "sha256": "5c16cffc781eb141df0e1e5deb3c89d95e177ca8590d96e789719daa060facc9",
       "bytes": 12214
@@ -558,23 +608,23 @@
     },
     {
       "path": "web/app.js",
-      "sha256": "db1c91d1a64ac9496a649e22fa3c9d6e768f97a2d37d1007ba5f11abf9e1060f",
-      "bytes": 10208
+      "sha256": "3bae60c3dc3bbc065d2371d646aa065c57d154f3a67ab829f923dc57bd551518",
+      "bytes": 22220
     },
     {
       "path": "web/index.html",
-      "sha256": "8aea9214af27b41fbcfe22d1672d9b0ac7bbbcbfa0a5c43d2e0ec5363ceb45f6",
-      "bytes": 6383
+      "sha256": "876aae9376744b1acf4bf70b9a46a0a1d98fa5f5c89b673ef07f2a9027466ce8",
+      "bytes": 7910
     },
     {
       "path": "web/style.css",
-      "sha256": "fa4f745487121eac5e722ffa4785cd4525b1b6face8ed7d9d3f6b017f7dae822",
-      "bytes": 8662
+      "sha256": "64cb4bc488e8586d0f689097b93330df95981c2c08a3e94814e8f9510707c89a",
+      "bytes": 12120
     },
     {
       "path": "web/worker.js",
-      "sha256": "268cba729305de5f7faf72fe2daae79c5fac71ee782f8e73974e742b7014e26d",
-      "bytes": 905
+      "sha256": "47f6c8709716ce74240a98615093b9b2004acda123ef7cf298fbc3fa1ca6b915",
+      "bytes": 2892
     }
   ]
 }

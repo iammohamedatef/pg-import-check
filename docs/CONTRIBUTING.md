@@ -27,7 +27,8 @@ npm run preview
 
 The preview listens on `http://127.0.0.1:4173`. Rebuild after source changes. `src/`
 is the no-I/O semantic core, `cli/` is the stdin adapter, and `web/` owns browser
-presentation and the worker. See [architecture](ARCHITECTURE.md) before changing a
+presentation and the worker. See [architecture](ARCHITECTURE.md) and
+[migration analyzer v0.2](MIGRATION_ANALYZER_V02.md) before changing a document
 boundary. Do not add analytics or send DDL to any endpoint. Keep schema examples
 synthetic and never record real input in test traces or issue attachments.
 

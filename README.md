@@ -1,6 +1,6 @@
 # pg-import-check
 
-**Check your PostgreSQL DDL against ImportFlow's reviewed Alpha target-schema profile.**
+**Analyze a PostgreSQL migration against ImportFlow's reviewed Alpha target-schema profile.**
 
 Find explicit structural conflicts and questions to bring to an ImportFlow review.
 **Your schema is analyzed locally in your browser and is not uploaded for analysis.**
@@ -9,9 +9,12 @@ telemetry is involved.
 
 ## Use the browser checker
 
-Paste DDL, choose **Check schema**, then read the result and full text report. Try the
-built-in example first. **Reset** clears the input and report; **Copy report** copies
-only after you request it. Reports can contain schema identifiers.
+Paste a migration/schema document or choose a local `.sql` file, then select
+**Discover tables**. The browser lists exact target identities, including non-public
+and schema-unresolved tables. Select a table to generate its report; switching targets
+reuses the retained document index. **Reset** clears the document, file state, target
+list and report. **Copy report** copies only after you request it. Reports can contain
+schema identifiers.
 
 To run the browser version locally from this source distribution:
 
@@ -22,8 +25,19 @@ npm run preview
 ```
 
 Open `http://127.0.0.1:4173`. Static assets load first; a dedicated Web Worker performs
-all analysis on your device. The application sends no DDL or reports to any endpoint
-and does not put them in URLs, cookies or browser storage.
+document discovery, association and target evaluation on your device. The application
+sends no migration text or reports to any endpoint and does not put them in URLs,
+cookies or browser storage. Local files are read directly by the page and are not
+uploaded.
+
+The v0.2 browser document limit is **2,097,152 UTF-8 bytes (2 MiB)**. Discovery
+preserves schema qualification and never assumes that an unqualified table belongs to
+`public`. Associated evidence is bounded to reviewed target-local statement forms and
+256 target-local statements. Evidence beyond that association bound, and relevant
+unsupported mutations or table/policy/trigger DROP lifecycles, is reported as
+`NOT_EVALUATED` rather than silently omitted. Document indexing also stops at 20,000
+statements, 150,000 tokens or 5,000 targets.
+See [migration analyzer v0.2](docs/MIGRATION_ANALYZER_V02.md) for the exact boundary.
 
 ## Use the CLI
 
@@ -38,8 +52,9 @@ node cli/pg-import-check.mjs < schema.sql
 Optionally run `npm link --ignore-scripts` after building to make the local command
 available as `pg-import-check < schema.sql`. No npm registry executable is published.
 Arguments (including filenames, `--help`, and `--version`) are not interpreted; use
-stdin redirection as shown above. The CLI accepts up to **262,144 bytes** of UTF-8 DDL and writes a
-deterministic plain-text report to stdout. It makes no network or database requests.
+stdin redirection as shown above. The CLI preserves the v0.1 single-target behavior: it
+accepts up to **262,144 bytes** of UTF-8 DDL and writes a deterministic plain-text report
+to stdout. It makes no network or database requests.
 
 ```sql
 CREATE TABLE public.contacts (
@@ -50,7 +65,8 @@ CREATE TABLE public.contacts (
 
 This example yields `no_structural_conflict_observed`. Adding a `jsonb` column establishes
 a profile conflict; omitting the primary key declaration requires more evidence.
-Valid PostgreSQL outside the checker's closed recognition language can be refused.
+Valid PostgreSQL outside the checker's closed recognition language can be refused. The
+CLI does not provide the browser's v0.2 multi-table selection flow.
 
 ## Understand the result
 
@@ -75,17 +91,22 @@ report includes the ImportFlow review notice. Do not use an exit code to approve
   These are dated Alpha restrictions, not permanent product limits.
 
 This is **not production approval, a migration guarantee, a PostgreSQL validator or a
-security certification**. No live database is inspected. Live permissions, effective
-RLS/tenant isolation, trigger/function/rewrite effects, omitted objects, trusted system
-values, final mapping, installation and actual workload still require ImportFlow review.
+security certification**. No live database is inspected. Ordered final-state projection
+for `ADD/DROP COLUMN`, `DROP CONSTRAINT`, rename, column-type mutations, and target-local
+table/policy/trigger DROP lifecycles is not part of v0.2; these target-relevant operations
+are surfaced as `NOT_EVALUATED`. Live permissions,
+effective RLS/tenant isolation, trigger/function/rewrite effects, omitted objects,
+trusted system values, final mapping, installation and actual workload still require
+ImportFlow review.
 
 Use the report to prepare an [ImportFlow](https://importflow.dev/) review conversation.
 The checker does not automatically share your report or contact information.
 
 ## Source, verification and issues
 
-Start with [architecture](docs/ARCHITECTURE.md), [security and privacy](docs/SECURITY.md),
-and [evaluator API / predicate traceability](docs/EVALUATOR.md). Exact authority lives in
+Start with [migration analyzer v0.2](docs/MIGRATION_ANALYZER_V02.md),
+[architecture](docs/ARCHITECTURE.md), [security and privacy](docs/SECURITY.md), and
+[evaluator API / predicate traceability](docs/EVALUATOR.md). Exact authority lives in
 [the public profile](docs/PUBLIC_PROFILE_V4.md), [report/process behavior](docs/CHECK_BEHAVIOR_V2.md),
 [recognition contract](docs/DDL_RECOGNITION_V1.md) and [provenance](spec/provenance.json).
 Historical readiness wording in normative documents is preserved; this README describes

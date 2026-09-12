@@ -1,74 +1,105 @@
-// Presentation and the bounded UTF-16 transport adapter only. Policy stays in the worker.
+// Browser presentation and bounded UTF-16/file transport only. SQL policy stays in the worker/core.
 const ddl = document.getElementById("ddl");
 const check = document.getElementById("check");
 const example = document.getElementById("example");
 const reset = document.getElementById("reset");
 const copy = document.getElementById("copy");
 const report = document.getElementById("report");
+const reportView = document.getElementById("report-view");
+const rawReportDetails = document.getElementById("raw-report-details");
 const status = document.getElementById("status");
 const result = document.getElementById("result");
 const title = document.getElementById("result-title");
 const summary = document.getElementById("result-summary");
 const empty = document.getElementById("empty-state");
 const inputNote = document.getElementById("input-note");
+const discovery = document.getElementById("discovery");
+const targets = document.getElementById("targets");
+const documentMeta = document.getElementById("document-meta");
+const fileInput = document.getElementById("file-input");
+const fileState = document.getElementById("file-state");
+const dropZone = document.getElementById("drop-zone");
 
-const MAX_BYTES = 262_144;
+const MAX_BYTES = 2_097_152;
 const MAX_CODE_UNITS = MAX_BYTES + 1;
 const TIMEOUT_MS = 15_000;
-const INTERNAL_ERROR = "pg-import-check could not complete the check because of an internal error.";
+const INTERNAL_ERROR =
+  "pg-import-check could not complete the local analysis because of an internal error.";
+const FILE_PROMPT = "Choose a file or drop it here. It is read only by this page.";
 const EXAMPLE = `CREATE TABLE public.contacts (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  email text NOT NULL,
-  full_name text,
-  subscribed boolean,
-  created_at timestamptz DEFAULT now()
+  email character varying(320) NOT NULL,
+  created_at timestamp with time zone DEFAULT now()
 );
+
+CREATE TABLE auth.contacts (
+  id bigint PRIMARY KEY,
+  email text NOT NULL
+);
+
+ALTER TABLE public.contacts
+  ADD CONSTRAINT contacts_email_unique UNIQUE (email);
 `;
+
+const reportSections = [
+  "TARGET",
+  "RESULT",
+  "OBSERVED",
+  "FILE-MAPPABLE / FILE AUTHORITY",
+  "DATABASE / SYSTEM CONTROLLED",
+  "STRUCTURAL CONFLICTS",
+  "NOT EVALUATED",
+  "REQUIRES IMPORTFLOW REVIEW",
+  "BOTTOM LINE",
+];
 
 const outcomes = new Map([
   [
     "outside_envelope_observed",
     [
       "Structural conflict observed",
-      "Explicit declarations conflict with the dated Alpha profile. Review the findings below with ImportFlow.",
+      "Supplied deterministic evidence conflicts with the current Alpha target-schema profile.",
     ],
   ],
   [
     "more_evidence_required",
     [
       "More evidence required",
-      "A declared feature or missing declaration requires ImportFlow review. See the findings below.",
+      "No evaluated conflict takes precedence, but profile or NOT_EVALUATED facts require ImportFlow review.",
     ],
   ],
   [
     "no_structural_conflict_observed",
     [
       "No structural conflict observed",
-      "No structural conflict was observed among the declarations evaluated. ImportFlow review is still required; this is not production approval.",
+      "No structural conflict was observed in the evaluated evidence. Live/runtime review is still required.",
     ],
   ],
   [
     "refused",
     [
       "Analysis refused",
-      "Full analysis is unavailable for this input. This is not a finding of ImportFlow incompatibility. See the report for the reason and next step.",
+      "The selected target could not be safely evaluated under the bounded v0.2 recognition path.",
     ],
   ],
 ]);
 
 let worker = null;
 let timer = null;
-let revision = 0;
+let nextRequestId = 1;
+let pending = null;
 let currentReport = "";
+let currentTargets = [];
+let fileReadRevision = 0;
+let documentLoaded = false;
 
-function stopWorker() {
-  revision += 1;
+function terminateWorker() {
   clearTimeout(timer);
   timer = null;
+  pending = null;
   if (worker) worker.terminate();
   worker = null;
   result.setAttribute("aria-busy", "false");
-  check.textContent = "Check schema →";
 }
 
 function clearReport() {
@@ -76,63 +107,362 @@ function clearReport() {
   copy.disabled = true;
   copy.textContent = "Copy report";
   report.textContent = "";
-  report.hidden = true;
-  report.scrollTop = 0;
-  report.scrollLeft = 0;
+  reportView.replaceChildren();
+  reportView.hidden = true;
+  rawReportDetails.hidden = true;
+  rawReportDetails.open = false;
 }
 
-function ready(message) {
-  stopWorker();
+function clearDiscovery() {
+  currentTargets = [];
+  documentLoaded = false;
+  targets.replaceChildren();
+  documentMeta.textContent = "";
+  discovery.hidden = true;
+}
+
+function showReady(message) {
   clearReport();
   result.dataset.outcome = "empty";
+  result.setAttribute("aria-busy", "false");
   title.textContent = "Ready when you are";
   summary.textContent =
-    "Run a check to see observations, findings, and the areas that need ImportFlow review.";
+    "Analyze a document, then select a discovered target to see its deterministic report.";
   empty.hidden = false;
   status.textContent = message;
+  check.textContent = "Discover tables →";
+}
+
+function invalidateAnalysis(message) {
+  terminateWorker();
+  clearDiscovery();
+  showReady(message);
 }
 
 function internalError() {
-  stopWorker();
+  terminateWorker();
+  clearDiscovery();
   clearReport();
   result.dataset.outcome = "error";
-  title.textContent = "Check could not complete";
+  title.textContent = "Analysis could not complete";
   summary.textContent = INTERNAL_ERROR;
   empty.hidden = true;
   status.textContent = INTERNAL_ERROR;
+  check.textContent = "Retry discovery →";
   title.focus({ preventScroll: true });
 }
 
-// Only the trusted, fixed-position report header determines the summary.
-// Never search diagnostics or identifiers for verdict-like text.
-function reportOutcome(text) {
-  const lines = text.split("\n", 6);
-  if (lines[0] !== "PG IMPORT CHECK" || !text.endsWith("\n")) return null;
-  if (
-    lines[1] === "profile: importflow-envelope-v4 | 2026-09-09" &&
-    /^REFUSED: [a-z0-9_]+$/.test(lines[2])
-  )
-    return "refused";
-  if (
-    lines[1] !==
-      "profile: importflow-envelope-v4 | ImportFlow Founder-Assisted Alpha — target-schema check profile" ||
-    lines[2] !== "as of: 2026-09-09 | offline snapshot; current availability not verified" ||
-    !lines[3]?.startsWith("target: ")
-  )
-    return null;
-  const match =
-    /^TEXT-ONLY VERDICT: (outside_envelope_observed|more_evidence_required|no_structural_conflict_observed)$/.exec(
-      lines[4],
-    );
-  return match ? match[1] : null;
+function showDocumentFailure(refusalId) {
+  terminateWorker();
+  clearDiscovery();
+  clearReport();
+  result.dataset.outcome = "refused";
+  empty.hidden = true;
+  const messages = {
+    document_input_too_large: [
+      "Document too large",
+      "This v0.2 release accepts at most 2,097,152 UTF-8 bytes for one migration document.",
+    ],
+    invalid_utf8: [
+      "Invalid UTF-8 document",
+      "The supplied file is not valid UTF-8 and was not analyzed.",
+    ],
+    nul_byte_not_in_profile: [
+      "Unsupported document byte",
+      "The supplied document contains a NUL byte, which is outside the accepted input profile.",
+    ],
+    browser_lone_surrogate: [
+      "Invalid browser text input",
+      "The pasted text contains an unpaired UTF-16 surrogate and cannot be encoded without changing it.",
+    ],
+    document_too_many_statements: [
+      "Document exceeds analysis limits",
+      "The migration contains more top-level statements than this bounded analyzer permits.",
+    ],
+    document_too_many_tokens: [
+      "Document exceeds analysis limits",
+      "The migration contains more SQL tokens than this bounded analyzer permits.",
+    ],
+    document_too_many_targets: [
+      "Document exceeds analysis limits",
+      "The migration contains more target candidates than this bounded analyzer permits.",
+    ],
+    document_string_semantics_not_in_profile: [
+      "Unsupported string semantics",
+      "The migration changes standard_conforming_strings to a mode this bounded analyzer does not interpret.",
+    ],
+    document_target_lifecycle_not_bounded: [
+      "Unsupported target lifecycle statement",
+      "A target lifecycle statement could not be associated safely and the document was not analyzed.",
+    ],
+  };
+  const malformed = new Set([
+    "unterminated_block_comment",
+    "unterminated_quoted_identifier",
+    "unterminated_string",
+    "unterminated_dollar_quote",
+    "syntax_not_in_profile",
+    "unicode_escape_syntax_not_in_profile",
+    "unquoted_non_ascii_identifier",
+    "identifier_outside_profile",
+    "identifier_contains_unsafe_character",
+  ]);
+  const [heading, explanation] =
+    messages[refusalId] ??
+    (malformed.has(refusalId)
+      ? [
+          "Malformed or unsupported document",
+          `Safe document discovery stopped at a bounded lexical rule (${refusalId}).`,
+        ]
+      : ["Document analysis refused", `Safe document discovery stopped (${refusalId}).`]);
+  title.textContent = heading;
+  summary.textContent = explanation;
+  status.textContent = `${heading}. ${explanation}`;
+  check.textContent = "Retry discovery →";
+  title.focus({ preventScroll: true });
 }
 
-// Recognition contract §3.7: size lower bound, lone-surrogate validation,
-// exact byte length, then encoding. No allocation proportional to unbounded input.
-function prepareInput(text) {
-  // A cap-plus-one sentinel lets the core own the size refusal without encoding
-  // or transferring an oversized string. The core checks length before content.
-  if (text.length > MAX_BYTES) return { kind: "check", bytes: new Uint8Array(MAX_CODE_UNITS) };
+function showNoTargets(statementCount, byteLength) {
+  clearReport();
+  result.dataset.outcome = "refused";
+  result.setAttribute("aria-busy", "false");
+  title.textContent = "No table targets found";
+  summary.textContent =
+    "The document was indexed, but it contained no CREATE TABLE or meaningful ALTER TABLE target candidate.";
+  empty.hidden = true;
+  status.textContent = `Indexed ${statementCount} statements (${formatBytes(byteLength)}); no table targets were found.`;
+  check.textContent = "Rediscover tables →";
+  title.focus({ preventScroll: true });
+}
+
+function ensureWorker() {
+  if (worker) return worker;
+  const instance = new Worker(new URL("__WORKER_URL__", import.meta.url), { type: "module" });
+  worker = instance;
+  instance.onmessage = (event) => {
+    if (worker !== instance) return;
+    handleWorkerMessage(event.data);
+  };
+  instance.onerror = (event) => {
+    event.preventDefault();
+    if (worker === instance) internalError();
+  };
+  instance.onmessageerror = () => {
+    if (worker === instance) internalError();
+  };
+  return instance;
+}
+
+function beginRequest(kind, targetKey = null) {
+  if (pending !== null) throw new Error("Only one worker request may be active at a time.");
+  const requestId = nextRequestId++;
+  pending = { requestId, kind, targetKey };
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    if (pending?.requestId === requestId) internalError();
+  }, TIMEOUT_MS);
+  return requestId;
+}
+
+function finishRequest(requestId) {
+  if (pending?.requestId !== requestId) return false;
+  clearTimeout(timer);
+  timer = null;
+  pending = null;
+  result.setAttribute("aria-busy", "false");
+  setTargetButtonsDisabled(false);
+  return true;
+}
+
+function handleWorkerMessage(data) {
+  if (!data || !Number.isSafeInteger(data.requestId) || pending?.requestId !== data.requestId)
+    return;
+  const active = pending;
+  if (data.kind === "error") {
+    internalError();
+    return;
+  }
+  if (data.kind === "document_refused" && typeof data.refusalId === "string") {
+    finishRequest(data.requestId);
+    showDocumentFailure(data.refusalId);
+    return;
+  }
+  if (active.kind === "load" && data.kind === "discovered" && Array.isArray(data.targets)) {
+    finishRequest(data.requestId);
+    renderDiscovery(data);
+    return;
+  }
+  if (
+    active.kind === "evaluate" &&
+    data.kind === "report" &&
+    data.targetKey === active.targetKey &&
+    typeof data.report === "string" &&
+    outcomes.has(data.outcome)
+  ) {
+    finishRequest(data.requestId);
+    renderEvaluation(data.outcome, data.report);
+    return;
+  }
+  internalError();
+}
+
+function scopeLabel(target) {
+  if (!target.hasBaseDeclaration) return "base declaration incomplete";
+  if (target.scope === "public") return "public profile candidate";
+  if (target.scope === "outside_public_profile") return "outside public-schema profile";
+  return "schema unresolved";
+}
+
+function renderDiscovery(data) {
+  currentTargets = data.targets;
+  documentLoaded = true;
+  targets.replaceChildren();
+  documentMeta.textContent = `${data.targets.length} target${data.targets.length === 1 ? "" : "s"} · ${data.statementCount} statements · ${formatBytes(data.byteLength)}`;
+  discovery.hidden = false;
+  check.textContent = "Rediscover tables →";
+
+  for (const target of data.targets) {
+    const item = document.createElement("div");
+    item.className = "target-item";
+    item.setAttribute("role", "listitem");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "target-button";
+    button.dataset.targetKey = target.key;
+    button.setAttribute("aria-pressed", "false");
+    const identity = document.createElement("code");
+    identity.textContent = target.displayName;
+    const meta = document.createElement("span");
+    meta.className = "target-meta";
+    meta.textContent = `${scopeLabel(target)} · line ${target.sourceLine}`;
+    button.append(identity, meta);
+    button.addEventListener("click", () => evaluateTarget(target.key));
+    item.append(button);
+    targets.append(item);
+  }
+
+  if (data.targets.length === 0) {
+    discovery.hidden = true;
+    showNoTargets(data.statementCount, data.byteLength);
+    return;
+  }
+
+  result.dataset.outcome = "empty";
+  empty.hidden = false;
+  title.textContent = "Choose a target table";
+  summary.textContent =
+    "The migration is indexed locally. Select one exact table identity to generate its report.";
+  status.textContent = `Found ${data.targets.length} target${data.targets.length === 1 ? "" : "s"}. Choose a table to evaluate.`;
+  if (data.targets.length === 1) evaluateTarget(data.targets[0].key);
+}
+
+function setTargetButtonsDisabled(disabled) {
+  for (const button of targets.querySelectorAll("button.target-button")) button.disabled = disabled;
+}
+
+function markSelectedTarget(targetKey) {
+  for (const button of targets.querySelectorAll("button.target-button")) {
+    const selected = button.dataset.targetKey === targetKey;
+    button.setAttribute("aria-pressed", String(selected));
+    button.classList.toggle("selected", selected);
+  }
+}
+
+function evaluateTarget(targetKey) {
+  if (
+    !documentLoaded ||
+    pending !== null ||
+    !currentTargets.some((target) => target.key === targetKey)
+  )
+    return;
+  clearReport();
+  markSelectedTarget(targetKey);
+  setTargetButtonsDisabled(true);
+  result.dataset.outcome = "running";
+  result.setAttribute("aria-busy", "true");
+  title.textContent = "Evaluating selected target…";
+  summary.textContent = "Using the retained local document index and associated target evidence.";
+  empty.hidden = true;
+  status.textContent = "Evaluating the selected target locally…";
+  try {
+    const requestId = beginRequest("evaluate", targetKey);
+    ensureWorker().postMessage({ kind: "evaluate", requestId, targetKey });
+  } catch {
+    internalError();
+  }
+}
+
+function parseReport(text) {
+  if (!text.endsWith("\n") || !text.startsWith("PG IMPORT CHECK — MIGRATION v0.2\n")) return null;
+  const lines = text.split("\n");
+  lines.pop();
+  const sections = [];
+  let cursor = 0;
+  for (let i = 0; i < reportSections.length; i += 1) {
+    const heading = reportSections[i];
+    const at = lines.indexOf(heading, cursor);
+    if (at < cursor) return null;
+    const nextHeading = reportSections[i + 1];
+    const next = nextHeading === undefined ? lines.length : lines.indexOf(nextHeading, at + 1);
+    if (nextHeading !== undefined && next < 0) return null;
+    sections.push({
+      heading,
+      body:
+        lines
+          .slice(at + 1, next)
+          .join("\n")
+          .trim() || "—",
+    });
+    cursor = next;
+  }
+  return sections;
+}
+
+function renderEvaluation(outcome, text) {
+  const sections = parseReport(text);
+  if (sections === null) {
+    internalError();
+    return;
+  }
+  currentReport = text;
+  report.textContent = text;
+  reportView.replaceChildren();
+  for (const section of sections) {
+    const container = document.createElement("section");
+    container.className = "report-section";
+    container.dataset.section = section.heading;
+    const heading = document.createElement("h3");
+    heading.textContent = section.heading;
+    const body = document.createElement(section.heading === "BOTTOM LINE" ? "p" : "pre");
+    body.className = "report-section-body";
+    body.textContent = section.body;
+    container.append(heading, body);
+    reportView.append(container);
+  }
+  reportView.hidden = false;
+  rawReportDetails.hidden = false;
+  copy.disabled = false;
+  result.dataset.outcome = outcome;
+  const [heading, explanation] = outcomes.get(outcome);
+  title.textContent = heading;
+  summary.textContent = explanation;
+  empty.hidden = true;
+  status.textContent = `${heading}. Report ready; select another table to reuse the current document index.`;
+  title.focus({ preventScroll: true });
+}
+
+function formatBytes(value) {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
+  return `${(value / (1024 * 1024)).toFixed(2)} MiB`;
+}
+
+function oversizedSentinel() {
+  return new Uint8Array(MAX_BYTES + 1);
+}
+
+function prepareText(text) {
+  if (text.length > MAX_BYTES) return { kind: "load", bytes: oversizedSentinel() };
   let byteLength = 0;
   for (let i = 0; i < text.length; i += 1) {
     const unit = text.charCodeAt(i);
@@ -148,83 +478,93 @@ function prepareInput(text) {
       byteLength += unit < 0x80 ? 1 : unit < 0x800 ? 2 : 3;
     }
   }
-  if (byteLength > MAX_BYTES) return { kind: "check", bytes: new Uint8Array(MAX_CODE_UNITS) };
-  return { kind: "check", bytes: new TextEncoder().encode(text) };
+  if (byteLength > MAX_BYTES) return { kind: "load", bytes: oversizedSentinel() };
+  return { kind: "load", bytes: new TextEncoder().encode(text) };
 }
 
-function runCheck() {
-  stopWorker();
+function analyzeBytes(bytes) {
+  terminateWorker();
+  clearDiscovery();
   clearReport();
-  const run = revision;
   result.dataset.outcome = "running";
   result.setAttribute("aria-busy", "true");
-  title.textContent = "Checking locally…";
-  summary.textContent =
-    "Analyzing the supplied DDL on your device. You can reset or edit the input to cancel.";
+  title.textContent = "Discovering tables locally…";
+  summary.textContent = "Building the bounded document index in a Web Worker on this device.";
   empty.hidden = true;
-  check.textContent = "Restart check →";
-  status.textContent = "Checking your schema locally…";
+  status.textContent = "Discovering table targets locally…";
+  check.textContent = "Restart discovery →";
   try {
-    // The static build replaces this placeholder with the bundled worker URL.
-    worker = new Worker(new URL("__WORKER_URL__", import.meta.url), { type: "module" });
-    worker.onmessage = (event) => {
-      if (run !== revision) return;
-      const data = event.data;
-      const outcome =
-        data?.kind === "report" && typeof data.report === "string"
-          ? reportOutcome(data.report)
-          : null;
-      if (!outcome) {
-        internalError();
-        return;
-      }
-      stopWorker();
-      currentReport = data.report;
-      report.textContent = currentReport;
-      report.hidden = false;
-      copy.disabled = false;
-      result.dataset.outcome = outcome;
-      const [heading, explanation] = outcomes.get(outcome);
-      title.textContent = heading;
-      summary.textContent = explanation;
-      status.textContent = `${heading}. Report ready.`;
-      title.focus({ preventScroll: true });
-    };
-    worker.onerror = (event) => {
-      event.preventDefault();
-      if (run === revision) internalError();
-    };
-    worker.onmessageerror = () => {
-      if (run === revision) internalError();
-    };
-    timer = setTimeout(() => {
-      if (run === revision) internalError();
-    }, TIMEOUT_MS);
-    const input = prepareInput(ddl.value);
-    worker.postMessage(input, input.kind === "check" ? [input.bytes.buffer] : []);
+    const requestId = beginRequest("load");
+    ensureWorker().postMessage({ kind: "load", requestId, bytes }, [bytes.buffer]);
   } catch {
+    internalError();
+  }
+}
+
+function analyzeText() {
+  const prepared = prepareText(ddl.value);
+  if (prepared.kind === "refusal") {
+    invalidateAnalysis("Input could not be encoded safely.");
+    showDocumentFailure(prepared.refusalId);
+    return;
+  }
+  analyzeBytes(prepared.bytes);
+}
+
+async function loadLocalFile(file) {
+  const revision = ++fileReadRevision;
+  terminateWorker();
+  clearDiscovery();
+  showReady("Reading the selected local file…");
+  if (!file.name.toLowerCase().endsWith(".sql")) {
+    fileInput.value = "";
+    fileState.textContent = FILE_PROMPT;
+    status.textContent = "Choose a .sql file. No file content was analyzed.";
+    return;
+  }
+  fileState.textContent = `${file.name} · ${formatBytes(file.size)}`;
+  if (file.size > MAX_BYTES) {
+    ddl.value = "";
+    showDocumentFailure("document_input_too_large");
+    return;
+  }
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (revision !== fileReadRevision) return;
+    try {
+      ddl.value = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      ddl.value = "";
+    }
+    inputNote.textContent = `${file.name} is loaded from this device only; analysis runs in the local worker.`;
+    analyzeBytes(bytes);
+  } catch {
+    if (revision !== fileReadRevision) return;
     internalError();
   }
 }
 
 document.getElementById("check-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  runCheck();
+  analyzeText();
 });
 
 ddl.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) {
     event.preventDefault();
-    runCheck();
+    analyzeText();
   }
 });
 
 ddl.addEventListener("input", () => {
-  ready("Input changed. Run a check for an updated report.");
+  fileReadRevision += 1;
+  fileInput.value = "";
+  fileState.textContent = FILE_PROMPT;
+  invalidateAnalysis("Input changed. Discover tables again for the updated document.");
   inputNote.textContent =
     ddl.value.length >= MAX_CODE_UNITS
-      ? "The editor limit is reached. Reduce the input; the checker accepts at most 262,144 UTF-8 bytes."
-      : "Your edits stay in this page. Run a check when ready.";
+      ? "The editor limit is reached. Reduce the input; v0.2 accepts at most 2,097,152 UTF-8 bytes."
+      : "Edits stay on this page. Discover tables when ready.";
 });
 
 ddl.addEventListener("paste", (event) => {
@@ -232,31 +572,64 @@ ddl.addEventListener("paste", (event) => {
   const pasted = event.clipboardData.getData("text/plain");
   const length = ddl.value.length - (ddl.selectionEnd - ddl.selectionStart) + pasted.length;
   if (length > MAX_CODE_UNITS) {
-    // Reject instead of silently checking a browser-truncated schema.
     event.preventDefault();
     const message =
-      "Paste was not inserted: the editor accepts at most 262,145 code units. Reduce the DDL to 262,144 UTF-8 bytes for analysis.";
+      "Paste was not inserted: the editor accepts at most 2,097,153 code units so oversized input is never silently truncated.";
     inputNote.textContent = message;
     status.textContent = message;
   }
 });
 
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files?.[0];
+  if (file) void loadLocalFile(file);
+});
+
+for (const name of ["dragenter", "dragover"]) {
+  dropZone.addEventListener(name, (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    dropZone.classList.add("drag-active");
+  });
+}
+for (const name of ["dragleave", "dragend"]) {
+  dropZone.addEventListener(name, () => dropZone.classList.remove("drag-active"));
+}
+dropZone.addEventListener("drop", (event) => {
+  event.preventDefault();
+  dropZone.classList.remove("drag-active");
+  const files = event.dataTransfer?.files;
+  if (files?.length !== 1) {
+    status.textContent = "Drop exactly one local .sql file.";
+    return;
+  }
+  void loadLocalFile(files[0]);
+});
+
 example.addEventListener("click", () => {
+  fileReadRevision += 1;
+  fileInput.value = "";
+  fileState.textContent = FILE_PROMPT;
+  terminateWorker();
+  clearDiscovery();
   ddl.value = EXAMPLE;
-  ready("Example loaded. Run a check to see its report.");
-  inputNote.textContent = "Example: one public.contacts table. Edit it or check it as supplied.";
+  showReady("Example loaded. Discover its tables to begin.");
+  inputNote.textContent = "Synthetic example: one public target and one non-public target.";
   ddl.focus();
 });
 
 reset.addEventListener("click", () => {
+  fileReadRevision += 1;
+  fileInput.value = "";
+  fileState.textContent = FILE_PROMPT;
   ddl.value = "";
-  ready("Reset complete. Input and report cleared.");
-  inputNote.textContent = "Start with your DDL or load the example.";
+  terminateWorker();
+  clearDiscovery();
+  showReady("Reset complete. Document, target index, file state, and report are cleared.");
+  inputNote.textContent = "The document is indexed locally only when you analyze it.";
   ddl.focus();
 });
 
-// Native selection copying can omit the final LF or include visual wrapping.
-// Preserve exact bytes when the complete report is selected for manual copying.
 report.addEventListener("copy", (event) => {
   const selection = window.getSelection();
   if (
@@ -273,13 +646,14 @@ report.addEventListener("copy", (event) => {
 copy.addEventListener("click", async () => {
   if (!currentReport) return;
   const snapshot = currentReport;
-  const run = revision;
   try {
     await navigator.clipboard.writeText(snapshot);
-    if (run !== revision) return;
+    if (snapshot !== currentReport) return;
     status.textContent = "Report copied to clipboard.";
   } catch {
-    if (run !== revision) return;
+    if (snapshot !== currentReport) return;
+    rawReportDetails.hidden = false;
+    rawReportDetails.open = true;
     const selection = window.getSelection();
     if (selection) {
       const range = document.createRange();
@@ -288,14 +662,15 @@ copy.addEventListener("click", async () => {
       selection.addRange(range);
       report.focus();
       status.textContent =
-        "Clipboard access unavailable. Report selected; use your device’s Copy command.";
+        "Clipboard access unavailable. Raw report selected; use your device’s Copy command.";
     } else {
-      status.textContent = "Clipboard access unavailable. Select and copy the report manually.";
+      status.textContent =
+        "Clipboard access unavailable. Open the raw report and copy it manually.";
     }
   }
 });
 
-window.addEventListener("pagehide", () => ready("Ready. Run a new check to see your report."));
+window.addEventListener("pagehide", () => terminateWorker());
 check.disabled = false;
 example.disabled = false;
 reset.disabled = false;

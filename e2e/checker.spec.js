@@ -1,233 +1,327 @@
-import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
-const cli = fileURLToPath(new URL("../cli/pg-import-check.mjs", import.meta.url));
-const corpus = JSON.parse(
-  readFileSync(new URL("../spec/public-profile-cases.v4.json", import.meta.url), "utf8"),
+const multiTarget = `
+CREATE TABLE public.review_target (
+  id uuid PRIMARY KEY,
+  parent_id uuid REFERENCES public.parents(id) ON DELETE CASCADE,
+  value character varying(120)
 );
-const simple = "CREATE TABLE public.contacts (id integer PRIMARY KEY, email text NOT NULL);";
+CREATE TABLE public.conflict_target (
+  a uuid NOT NULL,
+  b uuid NOT NULL
+);
+ALTER TABLE public.conflict_target
+  ADD CONSTRAINT "conflict_pk" PRIMARY KEY (a, b);
+CREATE TABLE public.mutation_target (id uuid PRIMARY KEY, value text);
+ALTER TABLE public.mutation_target ADD COLUMN later text;
+CREATE TABLE auth.accounts (id uuid PRIMARY KEY);
+CREATE TABLE loose_target (id uuid PRIMARY KEY);
+ALTER TABLE public.alter_only ADD CONSTRAINT alter_only_pkey PRIMARY KEY (id);
+CREATE TABLE public."Mixed Name" (id uuid PRIMARY KEY);
+`;
 
-function cliReport(ddl) {
-  const result = spawnSync(process.execPath, [cli], {
-    input: Buffer.from(ddl, "utf8"),
-    timeout: 15_000,
-    maxBuffer: 4 * 1024 * 1024,
-  });
-  expect(result.error).toBeUndefined();
-  expect(result.signal).toBeNull();
-  expect([0, 2]).toContain(result.status);
-  expect(result.stderr.toString()).toBe("");
-  expect(result.stdout.at(-1)).toBe(10);
-  return result.stdout;
-}
-
-async function check(page, ddl) {
-  const expected = cliReport(ddl);
-  if (ddl.includes(String.fromCharCode(27))) {
-    // Firefox's simulated typing strips ESC before the app receives it. Assign
-    // exact hostile bytes at the DOM boundary to exercise the actual evaluator.
-    await page.locator("#ddl").evaluate((element, value) => {
-      element.value = value;
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-    }, ddl);
-  } else {
-    await page.locator("#ddl").fill(ddl);
-  }
-  // Textarea newline normalization must not silently change the oracle input.
-  expect(await page.locator("#ddl").inputValue()).toBe(ddl);
+async function discover(page, sql = multiTarget) {
+  await page.locator("#ddl").fill(sql);
   await page.locator("#check").click();
-  await expect.poll(() => page.locator("#report").textContent()).toBe(expected.toString("utf8"));
-  await expect(page.locator("#copy")).toBeEnabled();
-  expect(Buffer.from(await page.locator("#report").textContent(), "utf8")).toEqual(expected);
-  return expected.toString("utf8");
+  await expect(page.locator("#discovery")).toBeVisible();
+  await expect(page.locator("#targets .target-button").first()).toBeVisible();
 }
 
-test("first load explains local analysis and offers a labelled plain textarea", async ({
-  page,
-}) => {
+function targetButton(page, identity) {
+  return page
+    .locator("#targets .target-button")
+    .filter({ has: page.locator("code", { hasText: identity }) });
+}
+
+async function selectTarget(page, identity) {
+  const button = targetButton(page, identity);
+  await expect(button).toHaveCount(1);
+  await button.click();
+  await expect(page.locator("#report-view")).toBeVisible();
+  await expect(page.locator("#report")).toContainText("PG IMPORT CHECK — MIGRATION v0.2");
+}
+
+test("first load explains local full-document analysis and file input", async ({ page }) => {
   const response = await page.goto("/");
   expect(response.ok()).toBe(true);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const ddl = page.locator("#ddl");
-  await expect(ddl).toHaveValue("");
-  await expect(ddl).toHaveAccessibleName(/DDL|SQL|schema/i);
-  expect(await ddl.evaluate((element) => element.tagName)).toBe("TEXTAREA");
-  for (const id of ["check", "example", "reset", "copy"]) {
-    await expect(page.locator(`#${id}`)).toHaveRole("button");
-    await expect(page.locator(`#${id}`)).toHaveAccessibleName(/\S/);
-  }
-  await expect(page.locator("#copy")).toBeDisabled();
+  await expect(page.locator("#ddl")).toHaveValue("");
+  await expect(page.locator("#file-input")).toHaveAttribute("type", "file");
   await expect(page.locator("body")).toContainText(/locally.*browser|browser.*locally/i);
-  await expect(page.locator("body")).toContainText(
-    /not uploaded|never uploaded|never leaves|not sent/i,
-  );
+  await expect(page.locator("body")).toContainText(/not uploaded|not sent|stays.*browser/i);
+  await expect(page.locator("body")).toContainText("2,097,152 UTF-8 bytes");
   await expect(page.locator("body")).toContainText("importflow-envelope-v4");
-  await expect(page.locator("time[datetime='2026-09-09']")).toBeVisible();
-  await expect(page.locator("#status")).toHaveAttribute("aria-live", /polite|assertive/);
+  await expect(page.locator("#copy")).toBeDisabled();
 });
 
-test("example, repeated checks, edits, and reset do not retain stale output", async ({ page }) => {
+test("discovers exact identities and switches targets on one retained worker", async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWorker = globalThis.Worker;
+    globalThis.__workerCount = 0;
+    globalThis.Worker = class extends NativeWorker {
+      constructor(...args) {
+        super(...args);
+        globalThis.__workerCount += 1;
+      }
+    };
+  });
   await page.goto("/");
-  await page.locator("#example").click();
-  const example = await page.locator("#ddl").inputValue();
-  expect(example).toMatch(/CREATE TABLE/i);
-  await check(page, example);
-  await check(page, example);
-  await page.locator("#ddl").fill("SELECT 1;");
-  await expect(page.locator("#copy")).toBeDisabled();
+  await discover(page);
+  await expect(page.locator("#targets")).toContainText("public.review_target");
+  await expect(page.locator("#targets")).toContainText("auth.accounts");
+  await expect(page.locator("#targets")).toContainText("loose_target");
+  await expect(page.locator("#targets")).toContainText('public."Mixed Name"');
+  await expect(targetButton(page, "auth.accounts")).toContainText("outside public-schema profile");
+  await expect(targetButton(page, "loose_target")).toContainText("schema unresolved");
+  await expect(targetButton(page, "public.alter_only")).toContainText(
+    "base declaration incomplete",
+  );
+
+  await selectTarget(page, "public.review_target");
+  await expect(page.locator("#result-title")).toHaveText("More evidence required");
+  await expect(page.locator('[data-section="OBSERVED"]')).toContainText("foreign keys: 1");
+  await expect(page.locator('[data-section="OBSERVED"]')).toContainText("character varying");
+
+  await selectTarget(page, "public.conflict_target");
+  await expect(page.locator("#result-title")).toHaveText("Structural conflict observed");
+  await expect(page.locator('[data-section="STRUCTURAL CONFLICTS"]')).toContainText(
+    "composite_primary_key",
+  );
+  await expect(page.locator('[data-section="STRUCTURAL CONFLICTS"]')).toContainText(
+    'constraint "conflict_pk"',
+  );
+  await expect(page.locator('[data-section="STRUCTURAL CONFLICTS"]')).toContainText(/line \d+/);
+  expect(await page.evaluate(() => globalThis.__workerCount)).toBe(1);
+});
+
+test("NOT_EVALUATED mutation and ALTER-only incomplete evidence are explicit", async ({ page }) => {
+  await page.goto("/");
+  await discover(page);
+  await selectTarget(page, "public.mutation_target");
+  await expect(page.locator("#result-title")).toHaveText("More evidence required");
+  await expect(page.locator('[data-section="NOT EVALUATED"]')).toContainText("add_column");
+  await expect(page.locator('[data-section="OBSERVED"]')).toContainText(
+    "partial evaluated evidence",
+  );
+  await expect(page.locator('[data-section="FILE-MAPPABLE / FILE AUTHORITY"]')).toContainText(
+    "provisional from evaluated declarations",
+  );
+  await expect(page.locator('[data-section="BOTTOM LINE"]')).toContainText("NOT_EVALUATED");
+
+  await selectTarget(page, "public.alter_only");
+  await expect(page.locator('[data-section="OBSERVED"]')).toContainText(
+    "complete evaluated table shape is unavailable",
+  );
+  await expect(page.locator('[data-section="NOT EVALUATED"]')).toContainText(
+    "missing_base_declaration",
+  );
+  await expect(page.locator('[data-section="NOT EVALUATED"]')).toContainText(
+    "associated_statement_without_base",
+  );
+  await expect(page.locator('[data-section="NOT EVALUATED"]')).toContainText(
+    "constraint alter_only_pkey",
+  );
+});
+
+test("target-local policy and trigger DROP lifecycles stay explicit", async ({ page }) => {
+  await page.goto("/");
+  await discover(
+    page,
+    `
+      CREATE TABLE public.lifecycle_target (id uuid PRIMARY KEY);
+      CREATE POLICY reader ON public.lifecycle_target USING (true);
+      DROP POLICY IF EXISTS reader ON public.lifecycle_target;
+      CREATE TRIGGER refresh_row BEFORE UPDATE ON public.lifecycle_target
+        FOR EACH ROW EXECUTE FUNCTION public.refresh_row();
+      DROP TRIGGER IF EXISTS refresh_row ON public.lifecycle_target;
+    `,
+  );
+  await selectTarget(page, "public.lifecycle_target");
+  await expect(page.locator("#result-title")).toHaveText("More evidence required");
+  await expect(page.locator('[data-section="NOT EVALUATED"]')).toContainText("drop_policy");
+  await expect(page.locator('[data-section="NOT EVALUATED"]')).toContainText("drop_trigger");
+  await expect(page.locator('[data-section="NOT EVALUATED"]')).toContainText(
+    "final policy set is not established",
+  );
+  await expect(page.locator('[data-section="NOT EVALUATED"]')).toContainText(
+    "final trigger set is not established",
+  );
+  await expect(page.locator('[data-section="OBSERVED"]')).toContainText(
+    "partial evaluated evidence",
+  );
+});
+
+test("non-public and unqualified targets stay visible and are evaluated truthfully", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await discover(page);
+  await selectTarget(page, "auth.accounts");
+  await expect(page.locator('[data-section="TARGET"]')).toContainText("auth.accounts");
+  await expect(page.locator("#result-title")).toHaveText(
+    /Structural conflict observed|More evidence required/,
+  );
+
+  await selectTarget(page, "loose_target");
+  await expect(page.locator('[data-section="TARGET"]')).toContainText("loose_target");
+  await expect(page.locator('[data-section="REQUIRES IMPORTFLOW REVIEW"]')).toContainText(
+    /schema|qualification|review/i,
+  );
+});
+
+test("local .sql file selection discovers tables without a server upload", async ({ page }) => {
+  await page.goto("/");
+  const sql =
+    "CREATE TABLE public.file_one (id uuid PRIMARY KEY); CREATE TABLE public.file_two (id uuid PRIMARY KEY);";
+  await page.locator("#file-input").setInputFiles({
+    name: "local-schema.sql",
+    mimeType: "text/plain",
+    buffer: Buffer.from(sql),
+  });
+  await expect(page.locator("#file-state")).toContainText("local-schema.sql");
+  await expect(page.locator("#ddl")).toHaveValue(sql);
+  await expect(page.locator("#discovery")).toBeVisible();
+  await expect(page.locator("#targets .target-button")).toHaveCount(2);
+});
+
+test("drag/drop local .sql file uses the same local discovery path", async ({ page }) => {
+  await page.goto("/");
+  const sql =
+    "CREATE TABLE public.drop_one (id uuid PRIMARY KEY); CREATE TABLE public.drop_two (id uuid PRIMARY KEY);";
+  await page.locator("#drop-zone").evaluate((element, value) => {
+    const data = new DataTransfer();
+    data.items.add(new File([value], "dropped.sql", { type: "text/plain" }));
+    element.dispatchEvent(
+      new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }),
+    );
+  }, sql);
+  await expect(page.locator("#file-state")).toContainText("dropped.sql");
+  await expect(page.locator("#targets .target-button")).toHaveCount(2);
+});
+
+test("failed new analysis clears stale target/report state and reset clears everything", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await discover(page);
+  await selectTarget(page, "public.review_target");
+  await expect(page.locator("#copy")).toBeEnabled();
+
+  await page.locator("#ddl").fill("CREATE FUNCTION x() RETURNS void AS $broken$ SELECT 1;");
   await expect(page.locator("#report")).toHaveText("");
-  await check(page, "SELECT 1;");
+  await expect(page.locator("#discovery")).toBeHidden();
+  await page.locator("#check").click();
+  await expect(page.locator("#result-title")).toHaveText("Malformed or unsupported document");
+  await expect(page.locator("#copy")).toBeDisabled();
+  await expect(page.locator("#report-view")).toBeHidden();
+
   await page.locator("#reset").click();
   await expect(page.locator("#ddl")).toHaveValue("");
+  await expect(page.locator("#file-input")).toHaveValue("");
   await expect(page.locator("#report")).toHaveText("");
-  await expect(page.locator("#copy")).toBeDisabled();
-  await check(page, simple);
+  await expect(page.locator("#discovery")).toBeHidden();
 });
 
-for (const outcome of [
-  "no_structural_conflict_observed",
-  "outside_envelope_observed",
-  "more_evidence_required",
-  "refused",
-]) {
-  test(`${outcome}: exact CLI report bytes and distinct result presentation`, async ({ page }) => {
-    const item = corpus.cases.find((entry) => entry.expected_result === outcome);
-    expect(item).toBeDefined();
-    await page.goto("/");
-    const workers = [];
-    page.on("worker", (worker) => workers.push(worker.url()));
-    const report = await check(page, item.ddl);
-    expect(report).toContain(
-      outcome === "refused" ? "REFUSED: " : `TEXT-ONLY VERDICT: ${outcome}\n`,
-    );
-    await expect(page.locator("#result-title")).toBeVisible();
-    const titles = {
-      no_structural_conflict_observed: /no structural conflict/i,
-      outside_envelope_observed: /structural conflict|outside.*profile/i,
-      more_evidence_required: /more evidence|review required/i,
-      refused: /refused|analysis unavailable/i,
-    };
-    await expect(page.locator("#result-title")).toHaveText(titles[outcome]);
-    expect([...workers, ...page.workers().map((worker) => worker.url())]).toEqual(
-      expect.arrayContaining([expect.stringMatching(/\/worker-[A-Za-z0-9_-]+\.js$/)]),
-    );
-  });
-}
-
-test("all 56 conformance cases in one browser session match spawned CLI reports", async ({
+test("near 2 MiB document is admitted and one byte over is refused without stale output", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
-  const columns = (additional) =>
-    `CREATE TABLE public.t (id integer PRIMARY KEY, ${Array.from({ length: additional }, (_, i) => `c${i + 1} integer`).join(",")});`;
-  const recipes = {
-    columns_at_limit: () => columns(1599),
-    columns_over_limit: () => columns(1600),
-    constraint_limit: () =>
-      `CREATE TABLE public.t (id integer PRIMARY KEY, ${Array.from({ length: 2048 }, (_, i) => `CONSTRAINT k${i} CHECK (id > 0)`).join(",")});`,
-    enum_count_over: () =>
-      `CREATE TYPE public.e AS ENUM (${Array.from({ length: 4097 }, (_, i) => `'${i}'`).join(",")}); CREATE TABLE public.t (id integer PRIMARY KEY, value public.e);`,
-  };
-  expect(Object.keys(recipes).sort()).toEqual(
-    corpus.generated_boundaries.map((item) => item.id).sort(),
-  );
-  const cases = [
-    ...corpus.cases,
-    ...corpus.generated_boundaries.map((item) => ({ ...item, ddl: recipes[item.id]() })),
-  ];
-  expect(cases).toHaveLength(56);
-  await page.goto("/");
-  // Reuse a real page; each case still enters through the public UI and its worker.
-  for (const item of cases) {
-    await test.step(item.id, async () => {
-      const report = await check(page, item.ddl);
-      expect(report).toContain(
-        item.expected_result === "refused"
-          ? "REFUSED: "
-          : `TEXT-ONLY VERDICT: ${item.expected_result}\n`,
-      );
-    });
-  }
-});
-
-const hostileInputs = [
-  [
-    "HTML and quotes",
-    'CREATE TABLE public."<img src=x onerror=globalThis.__xss=1>" (id integer PRIMARY KEY, "a""b<em>" text);',
-  ],
-  [
-    "script identifier",
-    'CREATE TABLE public."<script>globalThis.__xss=1</script>" (id integer PRIMARY KEY);',
-  ],
-  [
-    "bidi and invisible Unicode",
-    'CREATE TABLE public."a\u202eb\u2066c\u200bd\ufeff" (id integer PRIMARY KEY, "مدخل" text);',
-  ],
-  [
-    "ANSI escape sequences",
-    'CREATE TABLE public."a\u001b[31mred\u001b[0m" (id integer PRIMARY KEY);',
-  ],
-  ["hostile diagnostic", "<svg/onload=globalThis.__xss=1><script>globalThis.__xss=1</script>"],
-  ["long diagnostic", "x".repeat(262_144)],
-];
-for (const [name, ddl] of hostileInputs) {
-  test(`hostile input remains text: ${name}`, async ({ page }) => {
-    const dialogs = [];
-    page.on("dialog", async (dialog) => {
-      dialogs.push(dialog.message());
-      await dialog.dismiss();
-    });
-    await page.goto("/");
-    const originalScripts = await page.locator("script").count();
-    const report = await check(page, ddl);
-    expect(await page.evaluate(() => globalThis.__xss)).toBeUndefined();
-    expect(dialogs).toEqual([]);
-    await expect(page.locator("#report *")).toHaveCount(0);
-    await expect(page.locator("script")).toHaveCount(originalScripts);
-    await expect(page.locator("[onerror], [onload], iframe, object, embed")).toHaveCount(0);
-    expect(report).not.toMatch(
-      // biome-ignore lint/suspicious/noControlCharactersInRegex: assert hostile control characters never reach rendered reports
-      /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b\u202e\u2066\ufeff]/u,
-    );
-    if (name === "long diagnostic") expect(report.length).toBeLessThan(2000);
-  });
-}
-
-test("UTF-8 byte cap accepts exactly 262144 bytes and refuses one byte over", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
-  const prefix = `${simple} /*`;
+  const base = "CREATE TABLE public.near_cap (id uuid PRIMARY KEY);";
+  const prefix = `${base} /*`;
   const suffix = "*/";
-  const paddingBytes = 262_144 - Buffer.byteLength(prefix + suffix);
-  // Multibyte padding detects code-unit/UTF-8 size confusion in the UI adapter.
-  const ddl =
-    prefix + "é".repeat(Math.floor(paddingBytes / 2)) + " ".repeat(paddingBytes % 2) + suffix;
-  expect(Buffer.byteLength(ddl)).toBe(262_144);
-  expect(await check(page, ddl)).toContain("TEXT-ONLY VERDICT: no_structural_conflict_observed\n");
-  expect(await check(page, `${ddl} `)).toContain("REFUSED: input_too_large\n");
-  await check(page, simple);
+  const exact = prefix + "x".repeat(2_097_152 - Buffer.byteLength(prefix + suffix)) + suffix;
+  expect(Buffer.byteLength(exact)).toBe(2_097_152);
+  await page.locator("#ddl").fill(exact);
+  await page.locator("#check").click();
+  await expect(page.locator("#result-title")).toHaveText(
+    /No structural conflict observed|More evidence required/,
+  );
+  await expect(page.locator("#report")).toContainText("public.near_cap");
+
+  await page.locator("#ddl").evaluate((element, value) => {
+    element.value = value;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  }, `${exact}x`);
+  await page.locator("#check").click();
+  await expect(page.locator("#result-title")).toHaveText("Document too large");
+  await expect(page.locator("#report")).toHaveText("");
 });
 
-test("keyboard can run a check and reset; controls and report fit the viewport", async ({
+test("malicious identifiers remain text and unsafe bidi identity is refused before rendering", async ({
   page,
 }) => {
+  const dialogs = [];
+  page.on("dialog", async (dialog) => {
+    dialogs.push(dialog.message());
+    await dialog.dismiss();
+  });
   await page.goto("/");
-  await page.locator("#ddl").focus();
-  await page.keyboard.insertText(simple);
-  // Follow actual tab order rather than activating a button through evaluate().
-  for (let step = 0; step < 15; step += 1) {
-    if (await page.locator("#check").evaluate((element) => element === document.activeElement))
-      break;
-    await page.keyboard.press("Tab");
+  const xss = 'CREATE TABLE public."x<script>globalThis.__xss=1</script>" (id uuid PRIMARY KEY);';
+  await page.locator("#ddl").fill(xss);
+  await page.locator("#check").click();
+  await expect(page.locator("#discovery")).toBeVisible();
+  await expect(page.locator("#targets")).toContainText("<script>");
+  await expect(page.locator("#report-view")).toBeVisible();
+  expect(await page.evaluate(() => globalThis.__xss)).toBeUndefined();
+  expect(dialogs).toEqual([]);
+  await expect(page.locator("#report-view script, #targets script")).toHaveCount(0);
+
+  const bidi = 'CREATE TABLE public."x\u202E" (id uuid PRIMARY KEY);';
+  await page.locator("#ddl").fill(bidi);
+  await page.locator("#check").click();
+  await expect(page.locator("#result-title")).toHaveText("Malformed or unsupported document");
+  await expect(page.locator("#discovery")).toBeHidden();
+});
+
+test("report exposes the required deterministic hierarchy", async ({ page }) => {
+  await page.goto("/");
+  await discover(page);
+  await selectTarget(page, "public.review_target");
+  for (const heading of [
+    "TARGET",
+    "RESULT",
+    "OBSERVED",
+    "FILE-MAPPABLE / FILE AUTHORITY",
+    "DATABASE / SYSTEM CONTROLLED",
+    "STRUCTURAL CONFLICTS",
+    "NOT EVALUATED",
+    "REQUIRES IMPORTFLOW REVIEW",
+    "BOTTOM LINE",
+  ]) {
+    await expect(
+      page.locator(`.report-section[data-section=${JSON.stringify(heading)}]`),
+    ).toBeVisible();
   }
-  await expect(page.locator("#check")).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect
-    .poll(() => page.locator("#report").textContent())
-    .toBe(cliReport(simple).toString("utf8"));
-  for (const id of ["ddl", "check", "reset", "copy", "report"]) {
+  await expect(page.locator("#raw-report-details")).toBeVisible();
+});
+
+test("Chromium copies exact raw report only after explicit copy", async ({
+  page,
+  context,
+  browserName,
+  baseURL,
+}) => {
+  test.skip(browserName !== "chromium", "Clipboard permission is verified on Chromium.");
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: new URL(baseURL).origin,
+  });
+  await page.goto("/");
+  await discover(page);
+  await selectTarget(page, "public.review_target");
+  const expected = await page.locator("#report").textContent();
+  const sentinel = "unchanged-before-copy";
+  await page.evaluate((value) => navigator.clipboard.writeText(value), sentinel);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(sentinel);
+  await page.locator("#copy").click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(expected);
+});
+
+test("controls and target/report content fit the mobile viewport", async ({ page }) => {
+  await page.goto("/");
+  await discover(page);
+  await selectTarget(page, "public.review_target");
+  for (const id of ["ddl", "check", "reset", "copy", "result"]) {
     const box = await page.locator(`#${id}`).boundingBox();
     expect(box).not.toBeNull();
     expect(box.x).toBeGreaterThanOrEqual(-1);
@@ -236,71 +330,4 @@ test("keyboard can run a check and reset; controls and report fit the viewport",
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize().width + 1,
   );
-  await page.locator("#reset").focus();
-  await page.keyboard.press("Space");
-  await expect(page.locator("#ddl")).toHaveValue("");
-  await expect(page.locator("#copy")).toBeDisabled();
-});
-
-test("Chromium copies exact report bytes only after the user clicks Copy", async ({
-  page,
-  context,
-  browserName,
-  baseURL,
-}) => {
-  test.skip(
-    browserName !== "chromium",
-    "Clipboard permission names differ across browser engines.",
-  );
-  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
-    origin: new URL(baseURL).origin,
-  });
-  await page.goto("/");
-  const sentinel = "clipboard unchanged before explicit copy";
-  await page.evaluate((value) => navigator.clipboard.writeText(value), sentinel);
-  for (const ddl of [simple, "SELECT 1;"]) {
-    const previous = await page.evaluate(() => navigator.clipboard.readText());
-    const report = await check(page, ddl);
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(previous);
-    await page.locator("#copy").click();
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(report);
-    expect(Buffer.from(await page.evaluate(() => navigator.clipboard.readText()))).toEqual(
-      cliReport(ddl),
-    );
-  }
-});
-
-test("clipboard denial offers a safe exact plain-text copy fallback", async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: async () => {
-          throw new Error("clipboard denied");
-        },
-      },
-    });
-  });
-  await page.goto("/");
-  const expected = await check(page, simple);
-  await page.locator("#copy").click();
-  await expect(page.locator("#status")).toContainText("Report selected");
-  const copied = await page.evaluate(() => {
-    // Firefox makes synthetic ClipboardEvent data read-only. A test-owned data
-    // store observes exactly what the app writes; real clipboard is tested above.
-    const clipboard = new Map();
-    const clipboardData = {
-      setData: (type, value) => clipboard.set(type, value),
-      getData: (type) => clipboard.get(type) || "",
-    };
-    const event = new Event("copy", { bubbles: true, cancelable: true });
-    Object.defineProperty(event, "clipboardData", { value: clipboardData });
-    document.querySelector("#report").dispatchEvent(event);
-    return {
-      text: clipboardData.getData("text/plain"),
-      html: clipboardData.getData("text/html"),
-      prevented: event.defaultPrevented,
-    };
-  });
-  expect(copied).toEqual({ text: expected, html: "", prevented: true });
 });

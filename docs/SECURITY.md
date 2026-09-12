@@ -1,10 +1,12 @@
 # Security and privacy
 
-Your schema is analyzed locally in your browser and is not uploaded for analysis.
+Your migration/schema is analyzed locally in your browser and is not uploaded for analysis.
 The site initially downloads static HTML, CSS, application JavaScript and worker
-JavaScript. DDL is converted to UTF-8 bytes and transferred to a dedicated worker.
-The worker invokes the same approved evaluator as the CLI, returns deterministic
-plain text, and is terminated after the run. No backend receives DDL.
+JavaScript. Pasted text or a locally selected `.sql` file is converted to UTF-8 bytes
+and transferred to a dedicated worker. The worker retains a bounded document index,
+returns exact target identities, and evaluates selected targets using the same approved
+profile predicates. Reset, input edits, a new document, timeout or worker failure clears
+that retained state. No backend receives migration text.
 
 ## Data handling
 
@@ -23,12 +25,22 @@ identifiers cannot become navigation targets or download filenames.
 
 ## Isolation and failure behavior
 
-The core caps input at 262,144 raw bytes before recognition. The editor bounds its
-accepted text and transfers at most the byte limit plus one overflow-proof byte.
-The evaluator remains responsible for deterministic refusals. The worker keeps parsing
-off the main thread; reset terminates a running worker. A worker exception, invalid
-response, startup failure or wall-clock timeout shows a generic application error,
-never a compatibility finding. Timeout is an adapter failure, not evaluator policy.
+The v0.2 browser document layer caps input at 2,097,152 raw bytes before discovery. The
+editor transfers at most that bound plus one content-free overflow sentinel. Document
+indexing is also bounded at 20,000 statements, 150,000 tokens and 5,000 targets. A
+document that selects non-standard `standard_conforming_strings` behavior refuses before
+discovery, so session-dependent legacy escapes cannot change recognized boundaries.
+Target-local association is limited to 256 statements; exceeding it creates explicit `association_limit_exceeded`
+`NOT_EVALUATED` evidence and cannot produce a clean conclusion. The v0.1 CLI retains its
+262,144-byte input cap.
+
+The worker keeps parsing off the main thread. A worker exception, invalid response,
+startup failure or wall-clock timeout shows a generic application error, never a
+compatibility finding. Timeout is an adapter failure, not evaluator policy.
+Shape-changing ordered mutations remain visible as `NOT_EVALUATED` when final state
+cannot be projected safely. Exact table, policy and trigger DROP forms are associated
+with their qualified target and remain `NOT_EVALUATED`; malformed or unbounded forms
+refuse the document.
 
 The CLI retains at most the byte limit plus one byte from stdin. Analyzed outcomes
 exit 0; deterministic refusal exits 2. Internal defects exit 1 with a fixed diagnostic

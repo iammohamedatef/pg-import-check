@@ -50,6 +50,7 @@ for (const path of packageJson.files) {
   assert.equal(typeof path, "string");
   assert.ok(!path.includes("*") && !path.includes("..") && !path.startsWith("/"));
   assert.ok(!/^(audit|publication|docs\/history|docs\/evidence)\//.test(path));
+  assert.ok(!/^test\/fixtures\//.test(path));
 }
 assert.ok(packageJson.files.includes("LICENSE"));
 assert.ok(packageJson.files.includes("NOTICE"));

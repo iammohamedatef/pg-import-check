@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark light" />
     <meta name="referrer" content="no-referrer" />
-    <meta name="description" content="Check PostgreSQL DDL locally against ImportFlow’s reviewed Alpha target-schema profile. Your schema is not uploaded for analysis." />
+    <meta name="description" content="Analyze a PostgreSQL migration locally against ImportFlow’s reviewed Alpha target-schema profile. Your SQL stays in this browser." />
     <title>pg-import-check · ImportFlow</title>
     <link rel="stylesheet" href="__STYLE_CSS__" />
     <script type="module" src="__APP_JS__"></script>
   </head>
   <body>
-    <a class="skip-link" href="#ddl">Skip to schema input</a>
+    <a class="skip-link" href="#ddl">Skip to migration input</a>
     <div class="shell">
       <header class="masthead">
         <span class="brand">ImportFlow <span class="brand-divider" aria-hidden="true">/</span> <span class="tool-name">pg-import-check</span></span>
@@ -20,63 +20,87 @@
 
       <main>
         <section class="intro" aria-labelledby="page-title">
-          <p class="eyebrow">PostgreSQL target-schema check</p>
-          <h1 id="page-title">Understand your DDL.<br />Know what needs review.</h1>
-          <p class="lede">Check your PostgreSQL DDL against ImportFlow’s reviewed Alpha target-schema profile.</p>
-          <p class="privacy"><span class="local-mark" aria-hidden="true"></span><strong>Analyzed locally in your browser.</strong> Your schema is not uploaded for analysis or saved by this app.</p>
+          <p class="eyebrow">PostgreSQL migration check · v0.2</p>
+          <h1 id="page-title">Inspect the migration.<br />Choose the target.</h1>
+          <p class="lede">Discover tables in a realistic migration or schema file, select the table you care about, and review deterministic ImportFlow compatibility evidence.</p>
+          <p class="privacy"><span class="local-mark" aria-hidden="true"></span><strong>Analyzed locally in your browser.</strong> Migration text is not uploaded for analysis or saved by this app.</p>
           <div class="scope-notice">
             <strong>No production approval or migration guarantee.</strong>
-            <span>Only supplied DDL is checked. Live schema, permissions, RLS, and trigger effects are not verified. ImportFlow review is still required.</span>
+            <span>Only supplied DDL is checked. Live schema state, effective permissions/RLS, and runtime trigger effects are not verified.</span>
           </div>
-          <p class="helper">Alpha scope: one <code>public</code> target on Supabase-hosted PostgreSQL 17, for insert-only imports.</p>
+          <p class="helper">Current Alpha target profile evaluates explicitly <code>public</code> tables. Non-public and schema-unresolved targets remain visible and are reported truthfully.</p>
           <p class="profile"><code>importflow-envelope-v4</code><span aria-hidden="true"> · </span><time datetime="2026-09-09">September 9, 2026</time><span class="profile-note">Offline snapshot; current availability not verified.</span></p>
         </section>
 
         <div class="workspace">
           <section class="panel input-panel" aria-labelledby="input-title">
             <div class="panel-heading">
-              <div><p class="eyebrow">01 / Input</p><h2 id="input-title">Your schema</h2></div>
+              <div><p class="eyebrow">01 / Input</p><h2 id="input-title">Migration or schema</h2></div>
               <button type="button" id="example" class="button secondary" disabled>Load example</button>
             </div>
             <form id="check-form" autocomplete="off">
-              <div class="editor-label"><label for="ddl">PostgreSQL DDL</label><span class="muted">Plain text</span></div>
-              <p id="input-help" class="helper">Supply one CREATE TABLE target and its supported associated declarations. Maximum 262,144 UTF-8 bytes.</p>
-              <textarea id="ddl" maxlength="262145" rows="8" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" wrap="off" dir="ltr" aria-describedby="input-help input-note" placeholder="Paste your CREATE TABLE statement here…"></textarea>
-              <p id="input-note" class="helper input-note">Start with your DDL or load the example.</p>
+              <div id="drop-zone" class="file-zone">
+                <div>
+                  <strong>Local .sql file</strong>
+                  <span id="file-state" class="helper file-state">Choose a file or drop it here. It is read only by this page.</span>
+                </div>
+                <label class="button secondary file-button" for="file-input">Choose .sql</label>
+                <input id="file-input" class="visually-hidden" type="file" accept=".sql,text/sql,text/plain" />
+              </div>
+              <div class="editor-label"><label for="ddl">PostgreSQL migration / schema</label><span class="muted">Plain text</span></div>
+              <p id="input-help" class="helper">Paste a full migration/schema or load a local .sql file. Maximum 2,097,152 UTF-8 bytes.</p>
+              <textarea id="ddl" maxlength="2097153" rows="10" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" wrap="off" dir="ltr" aria-describedby="input-help input-note" placeholder="Paste your migration or schema here…"></textarea>
+              <p id="input-note" class="helper input-note">The document is indexed locally only when you analyze it.</p>
               <div class="actions">
-                <button id="check" type="submit" class="button primary" aria-keyshortcuts="Control+Enter Meta+Enter" disabled>Check schema <span aria-hidden="true">→</span></button>
+                <button id="check" type="submit" class="button primary" aria-keyshortcuts="Control+Enter Meta+Enter" disabled>Discover tables <span aria-hidden="true">→</span></button>
                 <button id="reset" type="button" class="button secondary" disabled>Reset</button>
                 <span class="shortcut">Ctrl / ⌘ + Enter</span>
               </div>
             </form>
+
+            <section id="discovery" class="discovery" aria-labelledby="discovery-title" hidden>
+              <div class="discovery-heading">
+                <div>
+                  <p class="eyebrow">02 / Target</p>
+                  <h2 id="discovery-title">Tables found</h2>
+                </div>
+                <span id="document-meta" class="muted"></span>
+              </div>
+              <p class="helper">Choose one exact table identity to evaluate. Switching targets reuses this document index.</p>
+              <div id="targets" class="target-list" role="list" aria-label="Discovered table targets"></div>
+            </section>
           </section>
 
           <section id="result" class="panel result-panel" aria-labelledby="result-title" aria-busy="false" data-outcome="empty">
             <div class="panel-heading">
-              <div><p class="eyebrow">02 / Report</p><h2 id="result-title" tabindex="-1">Ready when you are</h2></div>
+              <div><p class="eyebrow">03 / Report</p><h2 id="result-title" tabindex="-1">Ready when you are</h2></div>
               <button id="copy" type="button" class="button secondary" disabled>Copy report</button>
             </div>
-            <p id="result-summary" class="result-summary">Run a check to see observations, findings, and the areas that need ImportFlow review.</p>
+            <p id="result-summary" class="result-summary">Analyze a document, then select a discovered target to see its deterministic report.</p>
             <div id="empty-state" class="empty-state">
               <span class="empty-symbol" aria-hidden="true">[ sql ]</span>
-              <p>Your report will appear here.</p>
-              <p class="helper">The check runs on your device.<br />No account or database connection needed.</p>
+              <p>Your selected target report will appear here.</p>
+              <p class="helper">No account or database connection is needed.</p>
             </div>
-            <p class="helper">Copied reports may contain schema identifiers. Share only what you intend.</p>
-              <pre id="report" tabindex="0" role="region" aria-label="Complete checker report" dir="ltr" hidden></pre>
+            <div id="report-view" class="report-view" hidden></div>
+            <details id="raw-report-details" class="raw-report-details" hidden>
+              <summary>Raw deterministic report</summary>
+              <pre id="report" tabindex="0" role="region" aria-label="Complete checker report" dir="ltr"></pre>
+            </details>
+            <p class="helper report-share-note">Copied reports may contain schema identifiers. Share only what you intend.</p>
           </section>
         </div>
 
-        <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Ready. Paste your DDL or load an example to begin.</p>
+        <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Ready. Paste a migration or choose a local .sql file.</p>
         <noscript><p class="scope-notice">JavaScript is required to run this local browser check. Enable JavaScript and reload the page.</p></noscript>
 
         <section class="reading-guide" aria-labelledby="guide-title">
           <h2 id="guide-title">Reading the result</h2>
           <dl class="outcomes">
-            <div><dt>Structural conflict observed</dt><dd>Explicit declarations conflict with the dated Alpha profile.</dd></div>
-            <div><dt>More evidence required</dt><dd>A declared feature or missing declaration needs ImportFlow review.</dd></div>
-            <div><dt>No structural conflict observed</dt><dd>No conflict was found among the declarations evaluated. External review is still required.</dd></div>
-            <div><dt>Analysis refused</dt><dd>The input cannot be fully analyzed under the accepted grammar or input limits. This is not a finding of incompatibility.</dd></div>
+            <div><dt>Structural conflict observed</dt><dd>Supplied deterministic evidence conflicts with the current Alpha profile.</dd></div>
+            <div><dt>More evidence required</dt><dd>No evaluated conflict takes precedence, but profile or NOT_EVALUATED facts require review.</dd></div>
+            <div><dt>No structural conflict observed</dt><dd>No conflict was found in the evaluated evidence. Live/runtime review is still required.</dd></div>
+            <div><dt>Analysis refused</dt><dd>The selected target cannot be safely evaluated under the bounded v0.2 recognition path.</dd></div>
           </dl>
         </section>
       </main>
