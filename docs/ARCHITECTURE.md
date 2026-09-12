@@ -69,3 +69,11 @@ See [migration analyzer v0.2](MIGRATION_ANALYZER_V02.md),
 [the exact report/process contract](CHECK_BEHAVIOR_V2.md). Normative documents preserve
 their original historical milestone wording; runnable implementation status belongs
 to the README and implementation documentation.
+
+## Migration Decision Report
+
+The v0.3 migration path adds separate modules for exhaustive statement coverage,
+column import-contract derivation, original source mapping, named structural details
+and deterministic decision synthesis. The frozen CLI evaluator remains separate.
+The worker sends structured decision sections and technical sections to the browser;
+only core code derives import semantics. See [the v0.3 contract](DECISION_REPORT_V03.md).

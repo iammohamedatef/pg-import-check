@@ -28,8 +28,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "c3e8525e8bc44202ab5eb9f43e6fd75eb231a290999411f9b5f2fb82d9920f05",
-      "bytes": 6533
+      "sha256": "e7df1a677e3bb4ca8abff5f71e73e5606e7c5f7a8c855db15b67ddf58882fb42",
+      "bytes": 7301
     },
     {
       "path": "SPECIFICATION.md",
@@ -58,8 +58,8 @@
     },
     {
       "path": "docs/ARCHITECTURE.md",
-      "sha256": "b618a2d0c33e7fd0d0a55228ce90a8aba1e64202d457304a23c30bb6f529e79e",
-      "bytes": 4235
+      "sha256": "446f55f8704d4b628f9d3f6ceae93879a78eb0c1c036a20526d1103739da695f",
+      "bytes": 4688
     },
     {
       "path": "docs/CHECK_BEHAVIOR_V2.md",
@@ -75,6 +75,11 @@
       "path": "docs/DDL_RECOGNITION_V1.md",
       "sha256": "74371c1841448053feef76b0cf195399c1cb46e56dc7dc3931b8ef42ed3116a4",
       "bytes": 67685
+    },
+    {
+      "path": "docs/DECISION_REPORT_V03.md",
+      "sha256": "da2ded6a3a60f7aef4860fefd29bed405c17865bdd36c0bf7bec482b4f83020b",
+      "bytes": 7210
     },
     {
       "path": "docs/EVALUATOR.md",
@@ -133,8 +138,13 @@
     },
     {
       "path": "e2e/checker.spec.js",
-      "sha256": "066e8a30c1977413850bb6ae1311fe680ca35c19e574e52b5f2aa5a3facfaf35",
-      "bytes": 14069
+      "sha256": "1f7926143e4f9bb9ef9e50c0fe403c335e5c8364152ab33f802cfc57340db359",
+      "bytes": 14521
+    },
+    {
+      "path": "e2e/decision.spec.js",
+      "sha256": "5db48efcb8c722bc831c5726857f27caa0bf9f8d4a35425620d63fed47e9beda",
+      "bytes": 3784
     },
     {
       "path": "e2e/privacy.spec.js",
@@ -153,13 +163,13 @@
     },
     {
       "path": "package-lock.json",
-      "sha256": "b62ce8d193eaede491b359cc89a38176c7db423d3c46a85f1c29349055786d9d",
+      "sha256": "58900357b0ada0ccb26d8de77f39aa75f3755133c2095107686793b6601b26d4",
       "bytes": 34395
     },
     {
       "path": "package.json",
-      "sha256": "dc6883e6d4d7895cc41f31ff21d71a0e0e38e0fda470e25d74665ede8f9861f8",
-      "bytes": 5649
+      "sha256": "e8c067d66a8e16a655932b36f974fe7a2a531cf154782b9b3875f09c2218ae3e",
+      "bytes": 5980
     },
     {
       "path": "playwright.config.js",
@@ -363,8 +373,23 @@
     },
     {
       "path": "src/migration-association.ts",
-      "sha256": "5fa16a5bc0035e3bbde138f1a06f117c92c3e2363602261d42593ee6141d4aef",
-      "bytes": 15800
+      "sha256": "183471950b726e108b770b68da93468f3ae55c6738d26b4ecb4eca87589ee6ef",
+      "bytes": 15858
+    },
+    {
+      "path": "src/migration-contract.ts",
+      "sha256": "9d1e457aeebd00f22da6f4aa2c047cc03a970c1b1fa36f980c58cedda658b9bc",
+      "bytes": 5610
+    },
+    {
+      "path": "src/migration-coverage.ts",
+      "sha256": "27b045d39a642a2c949367fcc861cc123bc63a9bc2ba33cc38d111d467c9704c",
+      "bytes": 5395
+    },
+    {
+      "path": "src/migration-decision.ts",
+      "sha256": "5705f621b131b33f78086cec9cb1fb2402f3455cdeed9b082ceb19c51abd6606",
+      "bytes": 16789
     },
     {
       "path": "src/migration-document.ts",
@@ -373,8 +398,13 @@
     },
     {
       "path": "src/migration-evaluator.ts",
-      "sha256": "68d2786e26889e71b86e92aee0a96da564e9b9725ae23025af93469c08f5cd84",
-      "bytes": 14353
+      "sha256": "c54fc4f0789eef9b736d2ac563c88c10ab943cb487d2ca1a072080c8b83969c0",
+      "bytes": 18314
+    },
+    {
+      "path": "src/migration-generation.ts",
+      "sha256": "88574928493943c661c56354bfbaf3ac37d23bafe0296ca683dba6451a7eb617",
+      "bytes": 5202
     },
     {
       "path": "src/migration-input.ts",
@@ -383,13 +413,23 @@
     },
     {
       "path": "src/migration-normalization.ts",
-      "sha256": "255bf673018c9d76228f8540f2baf9ead076786d741bb6f3b16bb5cfe031f203",
-      "bytes": 15425
+      "sha256": "219ab99a9bde52469d9a1c938356baf68c5255ea9dccb3bbbd0e14729a5eda61",
+      "bytes": 15922
     },
     {
       "path": "src/migration-report.ts",
-      "sha256": "b84648c9cd1db6cb7bd0bb755ea070871d7102edb278f25f040a9b08a5a35ba9",
-      "bytes": 9146
+      "sha256": "59b0e8662b10e5a2de5ca1df8f22fe7a26344334423eba7f18464ab3f03da72d",
+      "bytes": 11006
+    },
+    {
+      "path": "src/migration-source.ts",
+      "sha256": "14117f110ba7ac6281c31302cdac719edfd0db17226a6ee9ebb324eac12ac9a1",
+      "bytes": 3076
+    },
+    {
+      "path": "src/migration-structure.ts",
+      "sha256": "1aed7d3c16e18508ca72e830b4f6025c5b520d92d84e90b0eeb4b15c867c6702",
+      "bytes": 13299
     },
     {
       "path": "src/policy-evaluator.ts",
@@ -578,8 +618,18 @@
     },
     {
       "path": "test/migration-v02.test.ts",
-      "sha256": "570953cfb83be0294446367f221b3445b2690f52f4041e83245e43162b7d10e0",
-      "bytes": 15278
+      "sha256": "2d3debca470271482836e971820f011936bd96d280e0f9f12fff8a4c31206f1d",
+      "bytes": 15293
+    },
+    {
+      "path": "test/migration-v03-cases.ts",
+      "sha256": "3275c405a38fad637d623d4da66cea5c8b1d9aa477169f523c2f6d6012f21a14",
+      "bytes": 3944
+    },
+    {
+      "path": "test/migration-v03.test.ts",
+      "sha256": "2a835a0516a0103f08c172fb233b21375d56ba4f687e80044293e6ff6a6041e6",
+      "bytes": 21186
     },
     {
       "path": "test/report-contract.test.ts",
@@ -608,23 +658,23 @@
     },
     {
       "path": "web/app.js",
-      "sha256": "3bae60c3dc3bbc065d2371d646aa065c57d154f3a67ab829f923dc57bd551518",
-      "bytes": 22220
+      "sha256": "8f4d2996a3a0e54aa65efa540fc9233598087966fd39ff48bca146031db0cb91",
+      "bytes": 22444
     },
     {
       "path": "web/index.html",
-      "sha256": "876aae9376744b1acf4bf70b9a46a0a1d98fa5f5c89b673ef07f2a9027466ce8",
+      "sha256": "19c5403f9fd0b775d7b82b4c989965b254e98608cd58734e5728fc42e089298a",
       "bytes": 7910
     },
     {
       "path": "web/style.css",
-      "sha256": "64cb4bc488e8586d0f689097b93330df95981c2c08a3e94814e8f9510707c89a",
-      "bytes": 12120
+      "sha256": "668e889b1680a4df97c19ac20d1a4ff4930217c2f14ba17a832b596bb5d7de81",
+      "bytes": 12553
     },
     {
       "path": "web/worker.js",
-      "sha256": "47f6c8709716ce74240a98615093b9b2004acda123ef7cf298fbc3fa1ca6b915",
-      "bytes": 2892
+      "sha256": "f1a654f8ad738d3d59fb31e5e07ce1d0e3c5a3252414e960ea45725f2e12c039",
+      "bytes": 3213
     }
   ]
 }

@@ -39,6 +39,7 @@ export type MigrationNotEvaluated = {
 export type GeneratedColumnEvidence = {
   readonly column: IdentifierIdentity;
   readonly source: "identity" | "default";
+  readonly identityMode?: "always" | "by_default" | null;
   readonly span: SourceSpan;
 };
 

@@ -666,3 +666,24 @@ p.report-section-body {
     max-height: none;
   }
 }
+
+.decision-facts {
+  margin: 0;
+  padding-left: 1.2rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.decision-facts li + li {
+  margin-top: 0.45rem;
+}
+.fact-basis {
+  font-weight: 600;
+}
+.decision-section[data-decision-section="DECISION"] .decision-facts,
+.decision-section[data-decision-section="COVERAGE"] .decision-facts {
+  list-style: none;
+  padding-left: 0;
+}
+#technical-evidence .report-section {
+  padding-top: 1rem;
+}

@@ -1,7 +1,11 @@
 import { applyMigrationInputProfile } from "../src/migration-input.ts";
 import { createMigrationDocumentIndex } from "../src/migration-document.ts";
 import { evaluateMigrationTarget } from "../src/migration-evaluator.ts";
-import { renderMigrationTargetReport } from "../src/migration-report.ts";
+import { deriveMigrationDecision } from "../src/migration-decision.ts";
+import {
+  migrationTechnicalSections,
+  renderMigrationTargetReport,
+} from "../src/migration-report.ts";
 import { displayQualifiedIdentity } from "../src/report-safe-display.ts";
 
 let currentIndex = null;
@@ -73,11 +77,15 @@ self.onmessage = (event) => {
         reply(requestId, { kind: "error" });
         return;
       }
+      const decision = deriveMigrationDecision(evaluation);
+      const technicalSections = migrationTechnicalSections(evaluation, decision);
       reply(requestId, {
         kind: "report",
         targetKey: input.targetKey,
         outcome: evaluation.result,
-        report: renderMigrationTargetReport(evaluation),
+        report: renderMigrationTargetReport(evaluation, decision, technicalSections),
+        decision,
+        technicalSections,
       });
       return;
     }

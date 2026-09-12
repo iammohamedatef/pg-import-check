@@ -1,40 +1,88 @@
-import { displayIdentifier, displayQualifiedIdentity } from "./report-safe-display.js";
+import {
+  deriveMigrationDecision,
+  renderMigrationDecisionReport,
+  type MigrationDecisionReport,
+} from "./migration-decision.js";
+import {
+  displayDiagnosticPreview,
+  displayIdentifier,
+  displayQualifiedIdentity,
+} from "./report-safe-display.js";
 import { REASON_MESSAGES, type ReasonId } from "./public-profile.js";
 import { reasonOutcome, type MigrationTargetEvaluation } from "./migration-evaluator.js";
 
-export function renderMigrationTargetReport(evaluation: MigrationTargetEvaluation): string {
-  const lines: string[] = [
-    "PG IMPORT CHECK — MIGRATION v0.2",
-    "profile: importflow-envelope-v4 | supplied DDL only | local deterministic analysis",
-    "",
-    "TARGET",
-    displayQualifiedIdentity(evaluation.target.identity),
-    `source: line ${evaluation.target.firstSeenSpan.start.line}, column ${evaluation.target.firstSeenSpan.start.column}`,
-    "",
-    "RESULT",
-    evaluation.result,
-    "",
-    "OBSERVED",
+export function migrationTechnicalSections(
+  evaluation: MigrationTargetEvaluation,
+  decision: MigrationDecisionReport = deriveMigrationDecision(evaluation),
+): readonly { readonly heading: string; readonly body: string }[] {
+  const section = (
+    heading: string,
+    append: (lines: string[], e: MigrationTargetEvaluation) => void,
+  ) => {
+    const lines: string[] = [];
+    append(lines, evaluation);
+    return { heading, body: lines.join("\n") };
+  };
+  return [
+    {
+      heading: "TARGET",
+      body: `${displayQualifiedIdentity(evaluation.target.identity)}\nsource: line ${evaluation.target.firstSeenSpan.start.line}, column ${evaluation.target.firstSeenSpan.start.column}`,
+    },
+    { heading: "RESULT", body: evaluation.result },
+    section("OBSERVED", appendObserved),
+    section("FILE-MAPPABLE / FILE AUTHORITY", appendFileAuthority),
+    section("DATABASE / SYSTEM CONTROLLED", appendDatabaseControlled),
+    section("STRUCTURAL CONFLICTS", (lines, e) =>
+      appendReasons(lines, e, "outside_envelope_observed"),
+    ),
+    section("NOT EVALUATED", appendNotEvaluated),
+    section("REQUIRES IMPORTFLOW REVIEW", (lines, e) => {
+      appendReasons(lines, e, "more_evidence_required");
+      appendExternalReview(lines);
+    }),
+    {
+      heading: "STRUCTURAL DETAILS",
+      body:
+        deriveMigrationDecision(evaluation)
+          .databaseBehavior.map((f) => `- ${f.basis}: ${f.text}`)
+          .join("\n") || "- none established",
+    },
+    {
+      heading: "COLUMN EVIDENCE",
+      body:
+        (evaluation.structure?.columns ?? [])
+          .map((c) => {
+            const contract = evaluation.contract?.columns.find(
+              (entry) => entry.name.identity === c.name.identity,
+            );
+            return `- ${displayIdentifier(c.name)}: ${displayDiagnosticPreview(c.type)}; ${contract?.state}; authority ${contract?.authority}; nullable ${contract?.nullable}; identity mode ${contract?.identityMode ?? "not established"}; rules ${contract?.reasonIds.join(", ") || "none"}; line ${c.span.start.line}`;
+          })
+          .join("\n") || "- none established",
+    },
+    {
+      heading: "STATEMENT ACCOUNTING",
+      body: (evaluation.coverage?.statements ?? [])
+        .map((s) => `- #${s.ordinal + 1} ${s.label}: ${s.state}; line ${s.span.start.line}`)
+        .join("\n"),
+    },
+    { heading: "BOTTOM LINE", body: decision.bottomLine.join(" ") },
   ];
+}
 
-  appendObserved(lines, evaluation);
-  lines.push("", "FILE-MAPPABLE / FILE AUTHORITY");
-  appendFileAuthority(lines, evaluation);
-  lines.push("", "DATABASE / SYSTEM CONTROLLED");
-  appendDatabaseControlled(lines, evaluation);
-  lines.push("", "STRUCTURAL CONFLICTS");
-  appendReasons(lines, evaluation, "outside_envelope_observed");
-  lines.push("", "NOT EVALUATED");
-  appendNotEvaluated(lines, evaluation);
-  lines.push("", "REQUIRES IMPORTFLOW REVIEW");
-  appendReasons(lines, evaluation, "more_evidence_required");
-  appendExternalReview(lines);
-  lines.push("", "BOTTOM LINE", bottomLine(evaluation), "");
-  return `${lines.join("\n")}\n`;
+export function renderMigrationTargetReport(
+  evaluation: MigrationTargetEvaluation,
+  decision: MigrationDecisionReport = deriveMigrationDecision(evaluation),
+  technical = migrationTechnicalSections(evaluation, decision),
+): string {
+  return `PG IMPORT CHECK — MIGRATION v0.3\nprofile: importflow-envelope-v4 | supplied DDL only | local deterministic analysis\n\nDECISION REPORT\n${renderMigrationDecisionReport(decision)}\nTECHNICAL EVIDENCE\n${technical.map((s) => `${s.heading}\n${s.body}`).join("\n\n")}\n\n`;
 }
 
 function appendObserved(lines: string[], evaluation: MigrationTargetEvaluation): void {
   const observed = evaluation.observed;
+  if (evaluation.result === "more_evidence_required")
+    lines.push(
+      "- No evaluated conflict takes precedence; unresolved supplied evidence requires review.",
+    );
   if (observed === null) {
     lines.push(
       "- A target identity was discovered, but a complete evaluated table shape is unavailable.",
@@ -55,8 +103,7 @@ function appendObserved(lines: string[], evaluation: MigrationTargetEvaluation):
     lines.push(`- foreign keys: ${observed.foreignKeyCount}`);
     if (observed.enumBackedColumnCount > 0)
       lines.push(`- enum-backed columns: ${observed.enumBackedColumnCount}`);
-    if (observed.generatedColumnCount > 0)
-      lines.push(`- generated/default-controlled columns: ${observed.generatedColumnCount}`);
+
     if (observed.associatedAlterConstraintCount > 0)
       lines.push(`- associated ALTER constraints: ${observed.associatedAlterConstraintCount}`);
     if (observed.uniqueIndexCount > 0)
@@ -96,44 +143,35 @@ function appendObserved(lines: string[], evaluation: MigrationTargetEvaluation):
 
 function appendFileAuthority(lines: string[], evaluation: MigrationTargetEvaluation): void {
   const columns =
-    evaluation.policy?.columns.filter(
-      (column) =>
-        column.disposition ===
-        "file mapping candidate; final classification requires ImportFlow review",
+    evaluation.contract?.columns.filter(
+      (c) =>
+        c.authority === "file_supplied" ||
+        c.authority === "database_default_available" ||
+        c.authority === "database_sequence_default",
     ) ?? [];
-  if (columns.length === 0) {
-    lines.push("- none established from the evaluated DDL");
-    return;
-  }
-  if (evaluation.notEvaluated.length > 0) {
+  if (evaluation.contract?.status === "provisional")
     lines.push(
       "- provisional from evaluated declarations; NOT EVALUATED statements may change final file authority",
     );
-  }
+  if (evaluation.contract?.profileConflict)
+    lines.push(
+      "- target is outside the current profile; all proposed mapping requires conflict review",
+    );
   for (const column of columns)
-    lines.push(`- ${displayIdentifier(column.name)} — file mapping candidate`);
+    lines.push(
+      `- ${displayIdentifier(column.name)} — ${column.state}${column.authority === "database_default_available" ? "; explicit source value permitted by ordinary DEFAULT semantics" : ""}`,
+    );
+  if (columns.length === 0) lines.push("- none established from the evaluated DDL");
 }
 
 function appendDatabaseControlled(lines: string[], evaluation: MigrationTargetEvaluation): void {
   const columns =
-    evaluation.policy?.columns.filter(
-      (column) =>
-        column.disposition === "excluded from file mapping by the ordinary generation/default rule",
+    evaluation.contract?.columns.filter(
+      (c) => c.authority === "database_identity" || c.authority === "database_generated_expression",
     ) ?? [];
-  if (columns.length === 0) {
-    lines.push("- none established from the evaluated DDL");
-    return;
-  }
-  if (evaluation.notEvaluated.length > 0) {
-    lines.push(
-      "- provisional from evaluated declarations; NOT EVALUATED statements may change final database control",
-    );
-  }
-  for (const column of columns) {
-    lines.push(
-      `- ${displayIdentifier(column.name)} — generation/default evidence excludes ordinary file authority`,
-    );
-  }
+  for (const column of columns)
+    lines.push(`- ${displayIdentifier(column.name)} — ${column.authority}; ${column.state}`);
+  if (columns.length === 0) lines.push("- none established from the evaluated DDL");
 }
 
 function appendReasons(
@@ -175,7 +213,18 @@ function appendNotEvaluated(lines: string[], evaluation: MigrationTargetEvaluati
   if (evaluation.refusal !== null) {
     lines.push(`- selected target recognition refused: ${evaluation.refusal.refusalId}`);
   }
-  if (evaluation.notEvaluated.length === 0 && evaluation.refusal === null) {
+  const ledger =
+    evaluation.coverage?.statements.filter(
+      (s) =>
+        s.state === "UNSUPPORTED_DOCUMENT_STATEMENT" ||
+        s.state === "RELEVANT_NOT_EVALUATED" ||
+        s.state === "UNRESOLVED_TARGET_ASSOCIATION",
+    ) ?? [];
+  for (const statement of ledger)
+    lines.push(
+      `- ${statement.label} — ${statement.state === "UNSUPPORTED_DOCUMENT_STATEMENT" ? "unsupported document statement; not evaluated" : statement.state === "UNRESOLVED_TARGET_ASSOCIATION" ? "target association unresolved; relevance and effects not established" : "relevant statement not evaluated"} (line ${statement.span.start.line})`,
+    );
+  if (evaluation.notEvaluated.length === 0 && evaluation.refusal === null && ledger.length === 0) {
     lines.push("- none");
     return;
   }
@@ -198,19 +247,6 @@ function appendExternalReview(lines: string[]): void {
     "- final mapping, trusted system values, workload, and data validation require review",
     "- this report is not production approval or a migration guarantee",
   );
-}
-
-function bottomLine(evaluation: MigrationTargetEvaluation): string {
-  switch (evaluation.result) {
-    case "outside_envelope_observed":
-      return "Supplied deterministic evidence establishes a conflict with the current ImportFlow Alpha target-schema profile; unresolved items may still require review.";
-    case "more_evidence_required":
-      return "No evaluated conflict takes precedence, but supplied DDL leaves profile or NOT_EVALUATED facts that require ImportFlow review.";
-    case "no_structural_conflict_observed":
-      return "No structural conflict was observed in the evaluated target evidence; live/runtime review is still required.";
-    case "refused":
-      return "The selected target could not be safely evaluated from this document; this is not a finding of ImportFlow incompatibility.";
-  }
 }
 
 export function isConflictReason(reasonId: ReasonId): boolean {

@@ -38,7 +38,7 @@ async function selectTarget(page, identity) {
   await expect(button).toHaveCount(1);
   await button.click();
   await expect(page.locator("#report-view")).toBeVisible();
-  await expect(page.locator("#report")).toContainText("PG IMPORT CHECK — MIGRATION v0.2");
+  await expect(page.locator("#report")).toContainText("PG IMPORT CHECK — MIGRATION v0.3");
 }
 
 test("first load explains local full-document analysis and file input", async ({ page }) => {
@@ -274,10 +274,26 @@ test("malicious identifiers remain text and unsafe bidi identity is refused befo
   await expect(page.locator("#discovery")).toBeHidden();
 });
 
-test("report exposes the required deterministic hierarchy", async ({ page }) => {
+test("report exposes the decision layer above expandable deterministic evidence", async ({
+  page,
+}) => {
   await page.goto("/");
   await discover(page);
   await selectTarget(page, "public.review_target");
+  for (const heading of [
+    "DECISION",
+    "TARGET",
+    "COVERAGE",
+    "IMPORT CONTRACT",
+    "PRIMARY FINDINGS",
+    "DATABASE BEHAVIOR",
+    "NEXT REVIEW",
+    "BOTTOM LINE",
+  ]) {
+    await expect(page.locator(`[data-decision-section="${heading}"]`)).toBeVisible();
+  }
+  await expect(page.locator("#technical-evidence")).not.toHaveAttribute("open", "");
+  await page.locator("#technical-evidence > summary").click();
   for (const heading of [
     "TARGET",
     "RESULT",

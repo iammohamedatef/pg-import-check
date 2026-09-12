@@ -41,18 +41,6 @@ ALTER TABLE public.contacts
   ADD CONSTRAINT contacts_email_unique UNIQUE (email);
 `;
 
-const reportSections = [
-  "TARGET",
-  "RESULT",
-  "OBSERVED",
-  "FILE-MAPPABLE / FILE AUTHORITY",
-  "DATABASE / SYSTEM CONTROLLED",
-  "STRUCTURAL CONFLICTS",
-  "NOT EVALUATED",
-  "REQUIRES IMPORTFLOW REVIEW",
-  "BOTTOM LINE",
-];
-
 const outcomes = new Map([
   [
     "outside_envelope_observed",
@@ -79,7 +67,7 @@ const outcomes = new Map([
     "refused",
     [
       "Analysis refused",
-      "The selected target could not be safely evaluated under the bounded v0.2 recognition path.",
+      "The selected target could not be safely evaluated under the bounded v0.3 recognition path.",
     ],
   ],
 ]);
@@ -161,7 +149,7 @@ function showDocumentFailure(refusalId) {
   const messages = {
     document_input_too_large: [
       "Document too large",
-      "This v0.2 release accepts at most 2,097,152 UTF-8 bytes for one migration document.",
+      "This v0.3 release accepts at most 2,097,152 UTF-8 bytes for one migration document.",
     ],
     invalid_utf8: [
       "Invalid UTF-8 document",
@@ -300,7 +288,7 @@ function handleWorkerMessage(data) {
     outcomes.has(data.outcome)
   ) {
     finishRequest(data.requestId);
-    renderEvaluation(data.outcome, data.report);
+    renderEvaluation(data.outcome, data.report, data.decision, data.technicalSections);
     return;
   }
   internalError();
@@ -392,62 +380,62 @@ function evaluateTarget(targetKey) {
   }
 }
 
-function parseReport(text) {
-  if (!text.endsWith("\n") || !text.startsWith("PG IMPORT CHECK — MIGRATION v0.2\n")) return null;
-  const lines = text.split("\n");
-  lines.pop();
-  const sections = [];
-  let cursor = 0;
-  for (let i = 0; i < reportSections.length; i += 1) {
-    const heading = reportSections[i];
-    const at = lines.indexOf(heading, cursor);
-    if (at < cursor) return null;
-    const nextHeading = reportSections[i + 1];
-    const next = nextHeading === undefined ? lines.length : lines.indexOf(nextHeading, at + 1);
-    if (nextHeading !== undefined && next < 0) return null;
-    sections.push({
-      heading,
-      body:
-        lines
-          .slice(at + 1, next)
-          .join("\n")
-          .trim() || "—",
-    });
-    cursor = next;
-  }
-  return sections;
-}
-
-function renderEvaluation(outcome, text) {
-  const sections = parseReport(text);
-  if (sections === null) {
+function renderEvaluation(outcome, text, decision, technicalSections) {
+  if (!decision || !Array.isArray(decision.sections) || !Array.isArray(technicalSections)) {
     internalError();
     return;
   }
   currentReport = text;
   report.textContent = text;
   reportView.replaceChildren();
-  for (const section of sections) {
+  for (const section of decision.sections) {
+    const container = document.createElement("section");
+    container.className = "report-section decision-section";
+    container.dataset.decisionSection = section.heading;
+    const heading = document.createElement("h3");
+    heading.textContent = section.heading;
+    const body = document.createElement("ul");
+    body.className = "decision-facts";
+    for (const fact of section.facts) {
+      const item = document.createElement("li");
+      const basis = document.createElement("span");
+      basis.className = "fact-basis";
+      basis.textContent = `${fact.basis}: `;
+      item.append(basis, document.createTextNode(fact.text));
+      body.append(item);
+    }
+    container.append(heading, body);
+    reportView.append(container);
+  }
+  const technical = document.createElement("details");
+  technical.id = "technical-evidence";
+  technical.className = "raw-report-details";
+  const label = document.createElement("summary");
+  label.textContent =
+    "Technical Evidence — declarations, rule identifiers and statement accounting";
+  technical.append(label);
+  for (const section of technicalSections) {
     const container = document.createElement("section");
     container.className = "report-section";
     container.dataset.section = section.heading;
     const heading = document.createElement("h3");
     heading.textContent = section.heading;
-    const body = document.createElement(section.heading === "BOTTOM LINE" ? "p" : "pre");
+    const body = document.createElement("pre");
     body.className = "report-section-body";
     body.textContent = section.body;
     container.append(heading, body);
-    reportView.append(container);
+    technical.append(container);
   }
+  reportView.append(technical);
   reportView.hidden = false;
   rawReportDetails.hidden = false;
   copy.disabled = false;
   result.dataset.outcome = outcome;
   const [heading, explanation] = outcomes.get(outcome);
   title.textContent = heading;
-  summary.textContent = explanation;
+  summary.textContent = `${decision.coverage}. ${explanation}`;
   empty.hidden = true;
-  status.textContent = `${heading}. Report ready; select another table to reuse the current document index.`;
+  status.textContent = `${decision.decision}. Report ready; select another table to reuse the current document index.`;
   title.focus({ preventScroll: true });
 }
 
@@ -563,7 +551,7 @@ ddl.addEventListener("input", () => {
   invalidateAnalysis("Input changed. Discover tables again for the updated document.");
   inputNote.textContent =
     ddl.value.length >= MAX_CODE_UNITS
-      ? "The editor limit is reached. Reduce the input; v0.2 accepts at most 2,097,152 UTF-8 bytes."
+      ? "The editor limit is reached. Reduce the input; v0.3 accepts at most 2,097,152 UTF-8 bytes."
       : "Edits stay on this page. Discover tables when ready.";
 });
 

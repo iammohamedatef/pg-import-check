@@ -1,3 +1,11 @@
+import { validateMigrationGeneration } from "./migration-generation.js";
+import {
+  deriveImportContract,
+  type ImportContract,
+  type ImportContractColumn,
+} from "./migration-contract.js";
+import { deriveMigrationStructure, type MigrationStructure } from "./migration-structure.js";
+import { deriveMigrationCoverage, type MigrationCoverage } from "./migration-coverage.js";
 import {
   ddlQualifiedIdentityKey,
   type DdlAlterConstraint,
@@ -48,10 +56,19 @@ export type MigrationObserved = {
   readonly rlsStatementCount: number;
 };
 
-export type MigrationTargetEvaluation = {
+export type MigrationProfileEvaluation = Omit<PolicyEvaluation, "columns"> & {
+  readonly columns: readonly {
+    readonly name: IdentifierIdentity;
+    readonly disposition: ImportContractColumn["state"];
+    readonly authority: ImportContractColumn["authority"];
+    readonly reasonIds: readonly ReasonId[];
+  }[];
+};
+
+export type MigrationTargetEvidence = {
   readonly target: MigrationTargetCandidate;
   readonly result: AnalyzedResult | "refused";
-  readonly policy: PolicyEvaluation | null;
+  readonly policy: PolicyEvaluation | MigrationProfileEvaluation | null;
   readonly evidence: DdlEvidence | null;
   readonly refusal: MigrationTargetRefusal | null;
   readonly notEvaluated: readonly MigrationNotEvaluated[];
@@ -60,6 +77,16 @@ export type MigrationTargetEvaluation = {
   readonly alterConstraintSources: readonly MigrationAlterConstraintSource[];
   readonly generatedColumns: readonly GeneratedColumnEvidence[];
   readonly observed: MigrationObserved | null;
+  readonly coverage?: MigrationCoverage;
+  readonly contract?: ImportContract;
+  readonly structure?: MigrationStructure;
+};
+
+export type MigrationTargetEvaluation = Omit<MigrationTargetEvidence, "policy"> & {
+  readonly policy: MigrationProfileEvaluation | null;
+  readonly coverage: MigrationCoverage;
+  readonly contract: ImportContract;
+  readonly structure: MigrationStructure;
 };
 
 export type MigrationAlterConstraintSource = {
@@ -74,6 +101,74 @@ export function evaluateMigrationTarget(
   index: MigrationDocumentIndex,
   targetKey: string,
 ): MigrationTargetEvaluation | null {
+  const evaluation = evaluateMigrationTargetCore(index, targetKey);
+  if (evaluation === null) return null;
+  const covered = { ...evaluation, coverage: deriveMigrationCoverage(index, evaluation) };
+  let referenceStatementsRemaining = 64;
+  let referenceBytesRemaining = 262_144;
+  const typeStatements = index.statements.filter((s) => s.kind === "create_type");
+  const structure = deriveMigrationStructure(index, covered, (key) => {
+    const candidate = index.targetByKey.get(key);
+    if (candidate === undefined) return null;
+    const plan = planMigrationTargetAssociation(index, candidate);
+    if (plan.base === null) return null;
+    // Bound all supplemental recognition work, including type declarations, before parsing.
+    const supporting = [plan.base, ...plan.supportedStatements, ...typeStatements];
+    const statementCost = supporting.length + plan.generatedColumns.length;
+    const byteCost =
+      supporting.reduce(
+        (sum, s) => sum + s.span.end.rawByteOffset - s.span.start.rawByteOffset,
+        0,
+      ) +
+      plan.generatedColumns.reduce(
+        (sum, g) => sum + g.span.end.rawByteOffset - g.span.start.rawByteOffset,
+        0,
+      );
+    if (statementCost > referenceStatementsRemaining || byteCost > referenceBytesRemaining)
+      return null;
+    referenceStatementsRemaining -= statementCost;
+    referenceBytesRemaining -= byteCost;
+    const referenced = evaluateMigrationTargetCore(index, key);
+    return referenced === null
+      ? null
+      : { ...referenced, coverage: deriveMigrationCoverage(index, referenced) };
+  });
+  const contract = deriveImportContract(covered);
+  return {
+    ...covered,
+    policy:
+      covered.policy === null
+        ? null
+        : {
+            ...covered.policy,
+            columns: contract.columns.map((column, ordinal) => ({
+              name: structure.columns[ordinal]?.name ?? column.name,
+              disposition: column.state,
+              authority: column.authority,
+              reasonIds: column.reasonIds,
+            })),
+          },
+    coverage: deriveMigrationCoverage(
+      index,
+      evaluation,
+      structure.foreignKeys.flatMap((f) => f.supportingStatementOrdinals),
+    ),
+    contract: {
+      ...contract,
+      columns: contract.columns.map((column, ordinal) => {
+        const original = structure.columns[ordinal];
+        if (original === undefined) throw new Error("Contract source association invariant");
+        return { ...column, name: original.name, span: original.span };
+      }),
+    },
+    structure,
+  };
+}
+
+function evaluateMigrationTargetCore(
+  index: MigrationDocumentIndex,
+  targetKey: string,
+): MigrationTargetEvidence | null {
   const target = index.targetByKey.get(targetKey);
   if (target === undefined) return null;
   const plan = planMigrationTargetAssociation(index, target);
@@ -178,7 +273,14 @@ export function evaluateMigrationTarget(
   }
   const rawBytes = joinChunks(chunks);
   let policy = evaluatePublicProfile(recognized.evidence, rawBytes);
-  const augmentation = augmentGeneratedColumns(policy, plan.generatedColumns, notEvaluated);
+  const generation = validateMigrationGeneration(
+    index,
+    recognized.evidence,
+    rawBytes,
+    plan.generatedColumns,
+  );
+  notEvaluated.push(...generation.notEvaluated);
+  const augmentation = augmentGeneratedColumns(policy, generation.accepted, notEvaluated);
   policy = augmentation.policy;
   notEvaluated.splice(0, notEvaluated.length, ...augmentation.notEvaluated);
   const result =
@@ -198,8 +300,8 @@ export function evaluateMigrationTarget(
     recognitionObservations: observations,
     includedStatements,
     alterConstraintSources,
-    generatedColumns: plan.generatedColumns,
-    observed: summarizeEvidence(recognized.evidence, plan.generatedColumns),
+    generatedColumns: generation.accepted,
+    observed: summarizeEvidence(recognized.evidence, generation.accepted),
   };
 }
 

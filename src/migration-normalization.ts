@@ -15,6 +15,7 @@ export type V02RecognitionObservation =
     }
   | {
       readonly kind: "foreign_key_action";
+      readonly referencesSpan: SourceSpan;
       readonly action:
         | "on delete cascade"
         | "on delete set null"
@@ -33,6 +34,12 @@ export type V02RecognitionObservation =
       readonly span: SourceSpan;
     };
 
+export type MigrationSourceReplacement = {
+  readonly start: number;
+  readonly end: number;
+  readonly byteLength: number;
+};
+
 type Replacement = {
   readonly start: number;
   readonly end: number;
@@ -49,7 +56,11 @@ const encoder = new TextEncoder();
 export function normalizeStatementForV02(
   input: AcceptedRawInput,
   statement: MigrationStatement,
-): { readonly bytes: Uint8Array; readonly observations: readonly V02RecognitionObservation[] } {
+): {
+  readonly bytes: Uint8Array;
+  readonly observations: readonly V02RecognitionObservation[];
+  readonly replacements: readonly MigrationSourceReplacement[];
+} {
   const replacements: Replacement[] = [];
   const observations: V02RecognitionObservation[] = [];
   if (statement.kind === "create_table") {
@@ -65,6 +76,9 @@ export function normalizeStatementForV02(
   }
   return {
     bytes: applyReplacements(input.rawBytes, statement.span, replacements),
+    replacements: [...replacements]
+      .sort((a, b) => a.start - b.start)
+      .map((r) => ({ start: r.start, end: r.end, byteLength: r.replacement.byteLength })),
     observations,
   };
 }
@@ -372,7 +386,8 @@ function collectForeignKeyActionReplacements(
   for (let index = 0; index < tokens.length; index += 1) {
     if (word(tokens[index]) !== "on") continue;
     const currentDepth = depths[index] ?? 0;
-    if (!hasReferencesInCurrentClause(tokens, depths, index, currentDepth)) continue;
+    const referencesSpan = referencesInCurrentClause(tokens, depths, index, currentDepth);
+    if (referencesSpan === null) continue;
 
     const axis = word(tokens[index + 1]);
     const firstAction = word(tokens[index + 2]);
@@ -402,26 +417,27 @@ function collectForeignKeyActionReplacements(
     });
     observations.push({
       kind: "foreign_key_action",
+      referencesSpan,
       action,
       span: span(start.span, end.span),
     });
   }
 }
 
-function hasReferencesInCurrentClause(
+function referencesInCurrentClause(
   tokens: readonly CreateTableToken[],
   depths: readonly number[],
   before: number,
   currentDepth: number,
-): boolean {
+): SourceSpan | null {
   for (let index = before - 1; index >= 0; index -= 1) {
     const depth = depths[index] ?? 0;
     const token = tokens[index];
-    if (depth < currentDepth) return false;
-    if (depth === currentDepth && isPunctuation(token, ",")) return false;
-    if (depth === currentDepth && word(token) === "references") return true;
+    if (depth < currentDepth) return null;
+    if (depth === currentDepth && isPunctuation(token, ",")) return null;
+    if (depth === currentDepth && word(token) === "references") return token?.span ?? null;
   }
-  return false;
+  return null;
 }
 
 function applyReplacements(

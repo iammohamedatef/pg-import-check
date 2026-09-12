@@ -1,6 +1,6 @@
 # pg-import-check
 
-**Analyze a PostgreSQL migration against ImportFlow's reviewed Alpha target-schema profile.**
+**Get a deterministic import-readiness decision report for a PostgreSQL target table.**
 
 Find explicit structural conflicts and questions to bring to an ImportFlow review.
 **Your schema is analyzed locally in your browser and is not uploaded for analysis.**
@@ -68,6 +68,17 @@ a profile conflict; omitting the primary key declaration requires more evidence.
 Valid PostgreSQL outside the checker's closed recognition language can be refused. The
 CLI does not provide the browser's v0.2 multi-table selection flow.
 
+## Decision Report and import contract
+
+The browser's v0.3 report leads with a decision, exact target, explicit static coverage,
+required and optional source values, ordinary defaults, database generation, blocked
+fields and specific next-review needs. Named UNIQUE/FK/CHECK/enum/trigger/policy
+identities replace anonymous counts. Expand **Technical Evidence** for source locations,
+rule identifiers and the complete statement ledger, or copy the full plain-text report.
+An ordinary DEFAULT does not prohibit an explicit source value. Unsupported document
+statements such as INSERT are accounted for without interpreting their contents.
+See [Decision Report v0.3](docs/DECISION_REPORT_V03.md) for semantics and limits.
+
 ## Understand the result
 
 | Result | Meaning | CLI exit |
@@ -104,7 +115,7 @@ The checker does not automatically share your report or contact information.
 
 ## Source, verification and issues
 
-Start with [migration analyzer v0.2](docs/MIGRATION_ANALYZER_V02.md),
+Start with [Decision Report v0.3](docs/DECISION_REPORT_V03.md), [migration analyzer v0.2](docs/MIGRATION_ANALYZER_V02.md),
 [architecture](docs/ARCHITECTURE.md), [security and privacy](docs/SECURITY.md), and
 [evaluator API / predicate traceability](docs/EVALUATOR.md). Exact authority lives in
 [the public profile](docs/PUBLIC_PROFILE_V4.md), [report/process behavior](docs/CHECK_BEHAVIOR_V2.md),
