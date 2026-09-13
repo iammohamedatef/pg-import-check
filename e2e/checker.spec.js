@@ -49,7 +49,7 @@ test("first load explains local full-document analysis and file input", async ({
   await expect(page.locator("#file-input")).toHaveAttribute("type", "file");
   await expect(page.locator("body")).toContainText(/locally.*browser|browser.*locally/i);
   await expect(page.locator("body")).toContainText(/not uploaded|not sent|stays.*browser/i);
-  await expect(page.locator("body")).toContainText("2,097,152 UTF-8 bytes");
+  await expect(page.locator("#input-help")).toContainText("UTF-8 · Up to 2 MiB");
   await expect(page.locator("body")).toContainText("importflow-envelope-v4");
   await expect(page.locator("#copy")).toBeDisabled();
 });

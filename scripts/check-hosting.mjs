@@ -10,7 +10,13 @@ assert.equal(origin.pathname, "/");
 assert.equal(origin.search, "");
 assert.equal(origin.hash, "");
 const files = (await readdir("dist/web")).sort();
-assert.ok(files.every((p) => p === "index.html" || /^[a-z]+-[A-Za-z0-9]+\.(js|css)$/.test(p)));
+assert.ok(
+  files.every(
+    (p) =>
+      ["index.html", "social.png", "robots.txt"].includes(p) ||
+      /^[a-z]+-[A-Za-z0-9]+\.(js|css)$/.test(p),
+  ),
+);
 const expected = new Map(
   await Promise.all(files.map(async (name) => [name, await readFile(`dist/web/${name}`)])),
 );
@@ -33,7 +39,10 @@ for (let offset = 0; offset < 32; offset += 4) {
       assert.match(response.headers.get("content-security-policy") || "", /connect-src 'none'/);
       assert.match(response.headers.get("content-security-policy") || "", /frame-ancestors 'none'/);
       const cache = response.headers.get("cache-control");
-      assert.match(cache || "", name === "index.html" ? /max-age=0/ : /immutable/);
+      assert.match(
+        cache || "",
+        !/^[a-z]+-[A-Za-z0-9]+\.(js|css)$/.test(name) ? /max-age=0/ : /immutable/,
+      );
       assert.equal(response.headers.get("set-cookie"), null);
       return {
         name,

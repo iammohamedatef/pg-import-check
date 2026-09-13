@@ -69,6 +69,13 @@ textarea,
   background: var(--text);
   color: var(--bg);
 }
+.button,
+a,
+summary {
+  transition:
+    background-color var(--motion),
+    color var(--motion);
+}
 .shell {
   width: min(100% - 4rem, 1280px);
   margin-inline: auto;
@@ -673,6 +680,9 @@ p.report-section-body {
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
+.decision-facts li {
+  padding-block: 0.375rem;
+}
 .decision-facts li + li {
   margin-top: 0.45rem;
 }
@@ -686,4 +696,294 @@ p.report-section-body {
 }
 #technical-evidence .report-section {
   padding-top: 1rem;
+}
+
+/* Product family: system typography, warm neutral surfaces, restrained teal. */
+:root {
+  --bg: #131716;
+  --surface: #1b201e;
+  --inset: #161b19;
+  --hover: #29322e;
+  --text: #eef1ea;
+  --muted: #b2bcb5;
+  --border: #414c45;
+  --primary: #b5dac8;
+  --on-primary: #132a20;
+  --focus: #8dd5b2;
+  --radius: 6px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --motion: 140ms ease-out;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f2;
+    --surface: #fff;
+    --inset: #f6f7f2;
+    --hover: #edf1ea;
+    --text: #1d2922;
+    --muted: #56645b;
+    --border: #c8d1c8;
+    --primary: #245a43;
+    --on-primary: #fff;
+    --focus: #176443;
+  }
+}
+[hidden] {
+  display: none;
+}
+a {
+  color: inherit;
+  text-underline-offset: 0.25em;
+}
+.brand {
+  text-decoration: none;
+  letter-spacing: -0.035em;
+  font-size: 1.125rem;
+}
+.masthead nav,
+footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-size: 0.875rem;
+}
+.masthead nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.intro {
+  padding-block: 2rem 1.5rem;
+}
+h1 {
+  max-width: 32ch;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+}
+.lede {
+  max-width: 92ch;
+  margin-bottom: 0.75rem;
+}
+.privacy {
+  color: var(--text);
+  font-size: 0.8125rem;
+}
+.workspace {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 1.5rem;
+}
+.panel {
+  padding: 1.5rem;
+}
+.button,
+textarea,
+.raw-report-details,
+.target-button {
+  border-radius: var(--radius);
+}
+textarea {
+  min-height: 12rem;
+  font-size: 0.875rem;
+}
+.empty-state {
+  min-height: 16rem;
+  text-align: center;
+  padding: 2rem;
+  border-style: dashed;
+}
+.report-section {
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: 1.25rem 0;
+}
+.report-section h3 {
+  font-size: 0.875rem;
+  letter-spacing: 0.015em;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+.decision-facts {
+  font-size: 0.875rem;
+  list-style: none;
+  padding: 0;
+}
+.fact-basis {
+  font-size: 0.6875rem;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+}
+.raw-report-details {
+  overflow: visible;
+}
+.raw-report-details summary {
+  min-height: 44px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+#technical-evidence .report-section {
+  margin-inline: 1rem;
+}
+.commercial-bridge {
+  max-width: 52rem;
+  border-top: 1px solid var(--border);
+  margin: 3rem auto;
+  padding: 2rem 0;
+}
+.commercial-bridge > p {
+  max-width: 66ch;
+}
+.commercial-bridge a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+.reading-guide {
+  border-top: 1px solid var(--border);
+  padding-top: 2rem;
+}
+.file-zone:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+.target-button code,
+.report-section-body,
+.result-summary,
+.commercial-bridge {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 68rem) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .empty-state {
+    min-height: 7rem;
+  }
+}
+@media (max-width: 36rem) {
+  .shell {
+    width: calc(100% - 2rem);
+  }
+  .intro {
+    padding-block: 1.5rem;
+  }
+  .panel {
+    padding: 1rem;
+  }
+  .panel-heading {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .privacy {
+    line-height: 1.8;
+  }
+  textarea {
+    font-size: 1rem;
+  }
+  .commercial-bridge {
+    padding-inline: 0.25rem;
+  }
+  footer {
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  .button,
+  a,
+  summary {
+    transition: none;
+    animation: none;
+    scroll-behavior: auto;
+  }
+}
+
+.report-section h3 {
+  text-transform: none;
+}
+.result-panel {
+  scroll-margin-top: 1rem;
+}
+
+h1 {
+  max-width: none;
+  font-size: clamp(1.75rem, 2.5vw, 2rem);
+}
+textarea {
+  height: 13rem;
+  min-height: 10rem;
+}
+.input-note {
+  min-height: 0;
+}
+.report-view {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.report-section {
+  padding-inline: 0.25rem;
+}
+@media (min-width: 68rem) {
+  .workspace {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  }
+}
+
+@media (max-width: 36rem) {
+  .masthead nav a[href="#guide-title"] {
+    display: none;
+  }
+  .intro {
+    padding-block: 1rem;
+  }
+  .intro > .eyebrow {
+    display: none;
+  }
+  .intro h1 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .intro .lede {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+  }
+  .privacy {
+    font-size: 0.75rem;
+    line-height: 1.6;
+  }
+  .input-panel > .panel-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .input-panel h2 {
+    font-size: 1rem;
+  }
+  .file-zone {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+  .file-button {
+    width: auto;
+  }
+  .file-state {
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
 }

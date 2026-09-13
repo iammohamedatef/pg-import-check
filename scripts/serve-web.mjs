@@ -9,6 +9,8 @@ const types = {
   html: "text/html; charset=utf-8",
   js: "text/javascript; charset=utf-8",
   css: "text/css; charset=utf-8",
+  png: "image/png",
+  txt: "text/plain; charset=utf-8",
 };
 createServer(async (request, response) => {
   let path;
@@ -20,7 +22,7 @@ createServer(async (request, response) => {
   }
   const file = path === "/" ? "index.html" : path.slice(1);
   if (
-    !/^(index\.html|[a-z]+-[A-Za-z0-9]+\.(js|css))$/.test(file) ||
+    !/^(index\.html|social\.png|robots\.txt|[a-z]+-[A-Za-z0-9]+\.(js|css))$/.test(file) ||
     !["GET", "HEAD"].includes(request.method)
   ) {
     response.writeHead(404, headers).end();
@@ -28,10 +30,9 @@ createServer(async (request, response) => {
   }
   try {
     const bytes = await readFile(new URL(file, root));
-    const cache =
-      file === "index.html"
-        ? "public, max-age=0, must-revalidate"
-        : "public, max-age=31536000, immutable";
+    const cache = ["index.html", "social.png", "robots.txt"].includes(file)
+      ? "public, max-age=0, must-revalidate"
+      : "public, max-age=31536000, immutable";
     response.writeHead(200, {
       ...headers,
       "Content-Type": types[file.split(".").at(-1)],

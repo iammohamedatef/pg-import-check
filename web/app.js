@@ -18,6 +18,7 @@ const targets = document.getElementById("targets");
 const documentMeta = document.getElementById("document-meta");
 const fileInput = document.getElementById("file-input");
 const fileState = document.getElementById("file-state");
+const bridge = document.getElementById("commercial-bridge");
 const dropZone = document.getElementById("drop-zone");
 
 const MAX_BYTES = 2_097_152;
@@ -25,10 +26,10 @@ const MAX_CODE_UNITS = MAX_BYTES + 1;
 const TIMEOUT_MS = 15_000;
 const INTERNAL_ERROR =
   "pg-import-check could not complete the local analysis because of an internal error.";
-const FILE_PROMPT = "Choose a file or drop it here. It is read only by this page.";
+const FILE_PROMPT = "Choose or drop a .sql file.";
 const EXAMPLE = `CREATE TABLE public.contacts (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  email character varying(320) NOT NULL,
+  email text NOT NULL,
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -53,7 +54,7 @@ const outcomes = new Map([
     "more_evidence_required",
     [
       "More evidence required",
-      "No evaluated conflict takes precedence, but profile or NOT_EVALUATED facts require ImportFlow review.",
+      "No evaluated conflict takes precedence, but profile or NOT_EVALUATED facts require technical review.",
     ],
   ],
   [
@@ -91,6 +92,7 @@ function terminateWorker() {
 }
 
 function clearReport() {
+  bridge.hidden = true;
   currentReport = "";
   copy.disabled = true;
   copy.textContent = "Copy report";
@@ -388,12 +390,25 @@ function renderEvaluation(outcome, text, decision, technicalSections) {
   currentReport = text;
   report.textContent = text;
   reportView.replaceChildren();
-  for (const section of decision.sections) {
+  const sectionOrder = [
+    "DECISION",
+    "TARGET",
+    "IMPORT CONTRACT",
+    "PRIMARY FINDINGS",
+    "DATABASE BEHAVIOR",
+    "COVERAGE",
+    "BOTTOM LINE",
+    "NEXT REVIEW",
+  ];
+  const presentedSections = [...decision.sections].sort(
+    (a, b) => sectionOrder.indexOf(a.heading) - sectionOrder.indexOf(b.heading),
+  );
+  for (const section of presentedSections) {
     const container = document.createElement("section");
     container.className = "report-section decision-section";
     container.dataset.decisionSection = section.heading;
     const heading = document.createElement("h3");
-    heading.textContent = section.heading;
+    heading.textContent = section.heading.charAt(0) + section.heading.slice(1).toLowerCase();
     const body = document.createElement("ul");
     body.className = "decision-facts";
     for (const fact of section.facts) {
@@ -419,7 +434,7 @@ function renderEvaluation(outcome, text, decision, technicalSections) {
     container.className = "report-section";
     container.dataset.section = section.heading;
     const heading = document.createElement("h3");
-    heading.textContent = section.heading;
+    heading.textContent = section.heading.charAt(0) + section.heading.slice(1).toLowerCase();
     const body = document.createElement("pre");
     body.className = "report-section-body";
     body.textContent = section.body;
@@ -436,7 +451,20 @@ function renderEvaluation(outcome, text, decision, technicalSections) {
   summary.textContent = `${decision.coverage}. ${explanation}`;
   empty.hidden = true;
   status.textContent = `${decision.decision}. Report ready; select another table to reuse the current document index.`;
+  const outside = outcome === "outside_envelope_observed";
+  document.getElementById("bridge-title").textContent = outside
+    ? "This target has a conflict with the dated Alpha profile."
+    : "Need to go beyond static analysis?";
+  document.getElementById("bridge-copy").textContent = outside
+    ? "ImportFlow’s current pilot covers a narrow one-table, insert-only Supabase scope. This report does not establish eligibility. Review the commercial scope before considering a pilot."
+    : "If a real customer is waiting on this import, ImportFlow’s pilot helps you prepare a one-table, insert-only migration into Supabase. Your engineer executes the production import.";
+  document.getElementById("bridge-price").hidden = outside;
+  document.getElementById("bridge-link").textContent = outside
+    ? "See the current pilot scope ↗"
+    : "Talk through this migration ↗";
+  bridge.hidden = false;
   title.focus({ preventScroll: true });
+  if (window.matchMedia("(max-width: 68rem)").matches) result.scrollIntoView({ block: "start" });
 }
 
 function formatBytes(value) {

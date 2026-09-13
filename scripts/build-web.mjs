@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 
 const outdir = "dist/web";
@@ -51,4 +51,6 @@ await writeFile(
   "dist/web-metafile.json",
   `${JSON.stringify({ worker: worker.metafile, app: app.metafile }, null, 2)}\n`,
 );
+await copyFile("docs/demo/social.png", `${outdir}/social.png`);
+await writeFile(`${outdir}/robots.txt`, "User-agent: *\nAllow: /\n");
 console.log(`Static application built in ${outdir}; no server functions or source maps.`);

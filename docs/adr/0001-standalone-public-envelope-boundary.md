@@ -1,13 +1,15 @@
 # ADR 0001: Public target-schema observation boundary
 
-Status: adopted for the successor public profile.
+Status: adopted.
 
-ImportFlow owns product and production-admission authority. A public DDL checker
-consumes an explicitly reviewed, dated projection of observable schema restrictions.
-Its rules and evaluation mechanics are wholly available in this distribution. Private
-traceability is maintained outside public builds. No production gate state or internal
-architecture is a public evaluator input.
+PG Import Check is independently runnable. Its static PostgreSQL evidence and complete
+report remain available without a commercial engagement.
 
-Publication requires separate projection and independent publication reviews. The
-selected public export preserves reproducibility without redistributing private audit
-lineage. Detailed lifecycle and ownership are in `docs/GOVERNANCE.md`.
+A dated profile supplies an additional comparison against observable target-schema
+restrictions. All rules and evaluation mechanics are present in this distribution.
+Profile conflicts must remain distinct from generic PostgreSQL errors, and no profile
+result establishes current commercial eligibility or production approval.
+
+No database, hosted analysis API, production gate state or external architecture
+repository is a build or evaluation input. Versioned profile bytes and declared digests
+make the comparison reproducible. See [Profile governance](../GOVERNANCE.md).

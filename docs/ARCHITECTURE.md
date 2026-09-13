@@ -1,79 +1,72 @@
 # Architecture
 
-The v0.1 synchronous `checkCompatibility(Uint8Array): string` remains the CLI's frozen
-single-target entry point. The v0.2 browser adds a bounded document layer above the same
-profile evaluator. Both paths perform no I/O and neither connects to a database.
+The hosted tool is a static application. SQL processing stays in a dedicated Web
+Worker on the visitor's device. Selecting another target reuses the document index.
 
 ```mermaid
-flowchart TD
-  CLI[CLI: bounded stdin bytes] --> API[src/index.ts]
-  UI[Browser: paste or local file] --> Worker[Persistent dedicated Web Worker]
-  Worker --> Document[Migration document admission and index]
-  Document --> Targets[Exact table identities and target selection]
-  Targets --> Association[Bounded target statement association]
-  Association --> V02[v0.2 recognition and evidence projection]
-  V02 --> Policy
-  Worker --> BrowserOutput[Target list and deterministic report]
-  API --> Input[input-profile: bounded byte snapshot]
-  Input --> Recognition[ddl-* and create-table-*: frozen v0.1 recognition]
-  Recognition --> Policy[policy-*: P01–P13]
-  Policy --> Report[report-*: deterministic safe text]
-  Profile[Approved embedded public profile] --> Policy
-  Profile --> Report
-  Report --> CLIOutput[CLI stdout]
+flowchart TB
+  Input[Migration / DDL]
+  subgraph Browser[Browser — on your device]
+    UI[Paste or local .sql file]
+    subgraph Worker[Dedicated Web Worker]
+      Index[Document index]
+      Association[Target association]
+      Evidence[Structural evidence]
+      Contract[Import contract]
+      Report[Decision report]
+      Index --> Association --> Evidence --> Contract --> Report
+      Profile[Dated profile comparison] --> Report
+    end
+    UI --> Index
+    Index --> Selection[Choose target]
+    Selection --> Association
+    Report --> View[Decision Report + Technical Evidence]
+  end
+  Input --> UI
+  Boundary[NO DATABASE CONNECTION · NO BACKEND ANALYSIS<br/>NO SQL EXECUTION · NO MIGRATION UPLOAD]
+  Browser --- Boundary
 ```
 
-## Where to start
+The diagram describes the browser path in v0.3. The v0.3.1 release changes presentation
+and documentation; it does not change this engine or the dated profile.
+
+## Code map
 
 | Path | Responsibility |
 | --- | --- |
-| `src/index.ts` | Frozen v0.1 semantic API used by the stdin CLI |
-| `src/migration-api.ts`, `migration-input.ts`, `migration-document.ts` | Additive v0.2 admission, discovery and document index |
-| `src/migration-association.ts`, `migration-normalization.ts`, `migration-evaluator.ts` | Exact target association, narrow v0.2 recognition and evidence projection |
-| `src/migration-report.ts` | Deterministic v0.2 target report |
-| `src/input-profile.ts`, `source-cursor`, `utf8`, `lexical-trivia` | Raw bounds, UTF-8, source spans and lexical primitives |
-| `src/create-table-*` | Frozen bounded recognition grammar and declaration conflict selectors |
-| `src/ddl-*` | Statement adapters, typed evidence, complete declaration association |
-| `src/policy-*` | Approved predicate evaluation and ordered findings |
-| `src/report-*` | Governed report bytes and safe dynamic display |
-| `src/public-profile.ts` | Embedded public data; verified against approved JSON before build |
-| `cli/` | Bounded stdin and process exit/error handling |
-| `web/` | Static page, local file/paste input, target selection, DOM presentation and persistent worker boundary |
-| `test/` | Core, conformance, exact reports, recognition parity and real CLI processes |
-| `e2e/` | Browser flows, failure handling, XSS and privacy tests |
-| `scripts/` | Build and verification, not application runtime |
-| `spec/`, `docs/` | Reviewed profile, behavior, recognition and contributor documentation |
+| `web/index.html`, `web/style.css`, `web/app.js` | Input transport, accessible target selection, text-only report presentation |
+| `web/worker.js` | Bounded messages, document retention, engine invocation |
+| `src/migration-api.ts`, `migration-input.ts`, `migration-document.ts` | Admission, discovery, document index |
+| `src/migration-association.ts`, `migration-normalization.ts` | Associate supplied statements with exact targets; retain uncertainty |
+| `src/migration-evaluator.ts`, `migration-structure.ts` | Evidence and dated profile evaluation |
+| `src/migration-contract.ts`, `migration-decision.ts`, `migration-coverage.ts` | Value authority, derived contract, decisions and explicit coverage |
+| `src/migration-report.ts` | Deterministic human-readable report and Technical Evidence |
+| `src/ddl-*`, `src/create-table-*` | Bounded structural recognition |
+| `src/policy-*`, `spec/` | Dated profile predicates and immutable profile material |
+| `src/index.ts`, `cli/` | Separate, frozen single-target stdin CLI |
+| `scripts/build-web.mjs` | Static bundles with no server functions or source maps |
+| `test/`, `e2e/` | Engine, browser, hostile-input and privacy regressions |
 
-The flat core uses descriptive family prefixes. Keeping these paths stable preserves
-reviewed grammar and test traceability. Parser evidence types refer to each other;
-the compiled runtime dependency graph is acyclic. Adapters depend on the core, never
-the reverse. Recognition does not depend on policy. There is no general PostgreSQL
-parser, dynamic plugin system, runtime profile fetch or second browser policy
-implementation. The worker retains one admitted document index so target switching
-does not reparse the full migration.
+## Trust boundary
 
-## Build and dependencies
+The core performs no I/O. The browser posts supplied bytes to its own worker,
+not to a server. Output is inserted as text, never interpreted as HTML.
+No SQL execution, database credentials, row processing, analytics, backend analysis,
+report upload, storage persistence or remote fonts are part of the checker.
+The host delivers static assets; ordinary hosting request logs are outside local analysis.
 
-TypeScript compiles the CLI's semantic core. esbuild bundles the same source into an
-isolated browser worker and a small separate DOM application. Native HTML/CSS controls
-need no frontend framework, editor package, UI kit or runtime npm dependency.
-Playwright is development-only browser automation. All direct dependencies are pinned
-and the npm lockfile records transitive integrity. Installs use `--ignore-scripts`.
+The application CSP retains `connect-src 'none'`, `img-src 'none'`,
+`font-src 'none'` and same-origin script/style/worker restrictions. Its links navigate
+with no referrer. The optional commercial link carries no query, report or SQL.
 
-The web output contains only HTML, hashed JavaScript and CSS. There are no functions,
-server rendering, source maps or environment-variable substitutions. No private
-repository is needed to install, build or verify the public source distribution.
+## Bounded behavior
 
-See [migration analyzer v0.2](MIGRATION_ANALYZER_V02.md),
-[security and privacy](SECURITY.md), [evaluator traceability](EVALUATOR.md), and
-[the exact report/process contract](CHECK_BEHAVIOR_V2.md). Normative documents preserve
-their original historical milestone wording; runnable implementation status belongs
-to the README and implementation documentation.
+The document accepts at most 2,097,152 UTF-8 bytes, 20,000 statements, 150,000 tokens
+and 5,000 targets. Target association is bounded to 256 statements per target.
+A worker timeout and input revision tracking keep stale results from being shown as
+current. Unsupported or unresolved statements remain visible in coverage accounting.
+The main thread rejects malformed UTF-16 rather than silently changing input bytes.
 
-## Migration Decision Report
-
-The v0.3 migration path adds separate modules for exhaustive statement coverage,
-column import-contract derivation, original source mapping, named structural details
-and deterministic decision synthesis. The frozen CLI evaluator remains separate.
-The worker sends structured decision sections and technical sections to the browser;
-only core code derives import semantics. See [the v0.3 contract](DECISION_REPORT_V03.md).
+The CLI preserves its separate 262,144-byte, single-target input contract. It is not
+the browser document interface. See [migration boundaries](MIGRATION_ANALYZER_V02.md),
+[Decision Report semantics](DECISION_REPORT_V03.md), and [threat model](THREAT_MODEL.md).

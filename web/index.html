@@ -5,8 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark light" />
     <meta name="referrer" content="no-referrer" />
-    <meta name="description" content="Analyze a PostgreSQL migration locally against ImportFlow’s reviewed Alpha target-schema profile. Your SQL stays in this browser." />
-    <title>pg-import-check · ImportFlow</title>
+    <meta name="description" content="Static import-readiness analysis for PostgreSQL migrations. Choose a table and inspect source requirements, database behavior and what still needs review." />
+    <title>PG Import Check — static PostgreSQL import-readiness analysis</title>
+    <link rel="canonical" href="https://check.importflow.dev/" />
+    <meta property="og:title" content="PG Import Check" />
+    <meta property="og:description" content="Check a PostgreSQL migration before you build the import. Local browser analysis. No signup." />
+    <meta property="og:url" content="https://check.importflow.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://check.importflow.dev/social.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="__STYLE_CSS__" />
     <script type="module" src="__APP_JS__"></script>
   </head>
@@ -14,42 +23,36 @@
     <a class="skip-link" href="#ddl">Skip to migration input</a>
     <div class="shell">
       <header class="masthead">
-        <span class="brand">ImportFlow <span class="brand-divider" aria-hidden="true">/</span> <span class="tool-name">pg-import-check</span></span>
-        <span class="badge">Founder-Assisted Alpha</span>
+        <a class="brand" href="/">PG Import Check</a>
+        <nav aria-label="Application navigation"><a href="#guide-title">About &amp; limits</a><a href="https://github.com/iammohamedatef/pg-import-check">GitHub</a></nav>
       </header>
 
       <main>
         <section class="intro" aria-labelledby="page-title">
-          <p class="eyebrow">PostgreSQL migration check · v0.3</p>
-          <h1 id="page-title">Inspect the migration.<br />Choose the target.</h1>
-          <p class="lede">Discover tables in a realistic migration or schema file, select the table you care about, and review deterministic ImportFlow compatibility evidence.</p>
-          <p class="privacy"><span class="local-mark" aria-hidden="true"></span><strong>Analyzed locally in your browser.</strong> Migration text is not uploaded for analysis or saved by this app.</p>
-          <div class="scope-notice">
-            <strong>No production approval or migration guarantee.</strong>
-            <span>Only supplied DDL is checked. Live schema state, effective permissions/RLS, and runtime trigger effects are not verified.</span>
-          </div>
-          <p class="helper">Current Alpha target profile evaluates explicitly <code>public</code> tables. Non-public and schema-unresolved targets remain visible and are reported truthfully.</p>
-          <p class="profile"><code>importflow-envelope-v4</code><span aria-hidden="true"> · </span><time datetime="2026-09-09">September 9, 2026</time><span class="profile-note">Offline snapshot; current availability not verified.</span></p>
+          <p class="eyebrow">Open-source utility <span aria-hidden="true">/</span> v0.3.1</p>
+          <h1 id="page-title">Check a PostgreSQL migration before you build the import.</h1>
+          <p class="lede">Drop in SQL, pick a table, and see what the source must provide, what Postgres can supply or generate, and which constraints, database behaviors and unknowns need review.</p>
+          <p class="privacy">Runs locally in your browser <span aria-hidden="true">·</span> No database connection <span aria-hidden="true">·</span> No upload <span aria-hidden="true">·</span> Open source</p>
         </section>
 
         <div class="workspace">
           <section class="panel input-panel" aria-labelledby="input-title">
             <div class="panel-heading">
               <div><p class="eyebrow">01 / Input</p><h2 id="input-title">Migration or schema</h2></div>
-              <button type="button" id="example" class="button secondary" disabled>Load example</button>
+              <button type="button" id="example" class="button secondary" disabled>Try an example</button>
             </div>
             <form id="check-form" autocomplete="off">
               <div id="drop-zone" class="file-zone">
                 <div>
                   <strong>Local .sql file</strong>
-                  <span id="file-state" class="helper file-state">Choose a file or drop it here. It is read only by this page.</span>
+                  <span id="file-state" class="helper file-state">Choose or drop a .sql file.</span>
                 </div>
                 <label class="button secondary file-button" for="file-input">Choose .sql</label>
                 <input id="file-input" class="visually-hidden" type="file" accept=".sql,text/sql,text/plain" />
               </div>
               <div class="editor-label"><label for="ddl">PostgreSQL migration / schema</label><span class="muted">Plain text</span></div>
-              <p id="input-help" class="helper">Paste a full migration/schema or load a local .sql file. Maximum 2,097,152 UTF-8 bytes.</p>
-              <textarea id="ddl" maxlength="2097153" rows="10" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" wrap="off" dir="ltr" aria-describedby="input-help input-note" placeholder="Paste your migration or schema here…"></textarea>
+              <p id="input-help" class="helper">Full migration or DDL · UTF-8 · Up to 2 MiB.</p>
+              <textarea id="ddl" maxlength="2097153" rows="8" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" wrap="off" dir="ltr" aria-describedby="input-help input-note" placeholder="Paste your migration or schema here…"></textarea>
               <p id="input-note" class="helper input-note">The document is indexed locally only when you analyze it.</p>
               <div class="actions">
                 <button id="check" type="submit" class="button primary" aria-keyshortcuts="Control+Enter Meta+Enter" disabled>Discover tables <span aria-hidden="true">→</span></button>
@@ -78,9 +81,9 @@
             </div>
             <p id="result-summary" class="result-summary">Analyze a document, then select a discovered target to see its deterministic report.</p>
             <div id="empty-state" class="empty-state">
-              <span class="empty-symbol" aria-hidden="true">[ sql ]</span>
-              <p>Your selected target report will appear here.</p>
-              <p class="helper">No account or database connection is needed.</p>
+              <span class="eyebrow">Decision Report</span>
+              <p>Source requirements. Database behavior. Next review.</p>
+              <p class="helper">Supply SQL, then select a table to see the complete report.</p>
             </div>
             <div id="report-view" class="report-view" hidden></div>
             <details id="raw-report-details" class="raw-report-details" hidden>
@@ -94,8 +97,19 @@
         <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Ready. Paste a migration or choose a local .sql file.</p>
         <noscript><p class="scope-notice">JavaScript is required to run this local browser check. Enable JavaScript and reload the page.</p></noscript>
 
+        <aside id="commercial-bridge" class="commercial-bridge" aria-labelledby="bridge-title" hidden>
+          <p class="eyebrow">Optional · ImportFlow design partner</p>
+          <h2 id="bridge-title">Need to go beyond static analysis?</h2>
+          <p id="bridge-copy">If a real customer is waiting on this import, ImportFlow’s pilot helps you prepare a one-table, insert-only migration into Supabase. Your engineer executes the production import.</p>
+          <p id="bridge-price" class="helper">Founder-assisted design-partner pilot · $500 fixed scope</p>
+          <a id="bridge-link" href="https://importflow.dev/design-partner" rel="noreferrer">Talk through this migration <span aria-hidden="true">↗</span></a>
+          <p class="helper">Your SQL and report are not sent when you continue. You choose what to share.</p>
+        </aside>
+
         <section class="reading-guide" aria-labelledby="guide-title">
           <h2 id="guide-title">Reading the result</h2>
+          <p class="scope-notice"><strong>Static evidence, not production approval.</strong> This does not validate source rows, live schema state, effective permissions/RLS, runtime expressions or trigger effects.</p>
+          <p class="helper">The report also compares evidence with the dated <code>importflow-envelope-v4</code> Alpha target profile (September 9, 2026). Profile conflicts are not universal PostgreSQL errors. Non-public and schema-unresolved targets remain visible. Current commercial availability is not evaluated.</p>
           <dl class="outcomes">
             <div><dt>Structural conflict observed</dt><dd>Supplied deterministic evidence conflicts with the current Alpha profile.</dd></div>
             <div><dt>More evidence required</dt><dd>No evaluated conflict takes precedence, but profile or NOT_EVALUATED facts require review.</dd></div>
@@ -105,7 +119,7 @@
         </section>
       </main>
 
-      <footer><nav aria-label="Project links"><a href="mailto:mohamed@importflow.dev">Discuss with ImportFlow</a><a href="https://github.com/iammohamedatef/pg-import-check">Source and profile docs</a><a href="mailto:mohamed@importflow.dev">Report a security issue privately</a></nav><span>pg-import-check <span aria-hidden="true">/</span> ImportFlow Alpha</span><span>Local analysis · No uploads · No telemetry</span></footer>
+      <footer><span>Open source by <a href="https://importflow.dev" rel="noreferrer">ImportFlow</a></span><nav aria-label="Project links"><a href="#guide-title">About &amp; limits</a><a href="https://github.com/iammohamedatef/pg-import-check#run-locally--self-host">Run locally</a><a href="https://github.com/iammohamedatef/pg-import-check/blob/main/docs/SECURITY.md">Security</a></nav><span>No telemetry · MIT licensed</span></footer>
     </div>
   </body>
 </html>
